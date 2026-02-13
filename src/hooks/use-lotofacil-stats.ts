@@ -25,7 +25,7 @@ export const useLotofacilStats = () => {
         atraso[i] = 0;
       }
 
-      concursos.forEach((c, idx) => {
+      concursos.forEach((c) => {
         c.dezenas.forEach((d: number) => {
           freqTotal[d]++;
         });
@@ -39,12 +39,19 @@ export const useLotofacilStats = () => {
 
       const somaMedia = concursos.reduce((acc, c) => acc + c.soma, 0) / concursos.length;
       const paresMedia = concursos.reduce((acc, c) => acc + c.pares, 0) / concursos.length;
+      
+      // Calcular média de repetidas (ignorando o primeiro concurso da lista se não tiver referência)
+      const concursosComRepetidas = concursos.filter(c => c.repetidas_anterior !== null);
+      const repetidasMedia = concursosComRepetidas.length > 0
+        ? concursosComRepetidas.reduce((acc, c) => acc + (c.repetidas_anterior || 0), 0) / concursosComRepetidas.length
+        : 9;
 
       setStats({
         freqTotal,
         atraso,
         somaMedia,
         paresMedia,
+        repetidasMedia,
         ultimoConcurso: concursos[0],
         historicoRecente: concursos.slice(0, 5)
       });

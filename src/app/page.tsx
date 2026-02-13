@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Hash, Calendar, Clock, Sparkles } from "lucide-react";
+import { RefreshCw, TrendingUp, Hash, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
@@ -111,7 +111,9 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
             <Sparkles className="h-5 w-5 text-rose-500" />
             <div>
-              <div className="text-2xl font-black tracking-tighter">9.2</div>
+              <div className="text-2xl font-black tracking-tighter">
+                {stats?.repetidasMedia?.toFixed(1) || "---"}
+              </div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Repetidas</p>
             </div>
           </div>
