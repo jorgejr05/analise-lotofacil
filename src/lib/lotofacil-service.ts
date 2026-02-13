@@ -28,7 +28,6 @@ export const calculatePoints = (jogoDezenas: number[], sorteioDezenas: number[])
 
 export const updateAllGamesPoints = async () => {
   try {
-    // Buscar jogos que ainda não foram conferidos ou que podem ser conferidos novamente
     const { data: jogos } = await supabase
       .from('jogos')
       .select('*');
@@ -36,9 +35,7 @@ export const updateAllGamesPoints = async () => {
     if (!jogos || jogos.length === 0) return;
 
     for (const jogo of jogos) {
-      // Buscar o resultado do concurso que este jogo estava visando
-      // Se não tiver concurso_referencia, podemos comparar com o último (opcional)
-      const targetConcurso = jogo.concurso_referencia + 1; // Geralmente joga-se no próximo
+      const targetConcurso = jogo.concurso_referencia + 1;
 
       const { data: concurso } = await supabase
         .from('concursos')
@@ -59,6 +56,13 @@ export const updateAllGamesPoints = async () => {
   }
 };
 
+// Função auxiliar para converter DD/MM/YYYY para YYYY-MM-DD
+const formatDateForDb = (dateStr: string) => {
+  if (!dateStr || !dateStr.includes('/')) return dateStr;
+  const [day, month, year] = dateStr.split('/');
+  return `${year}-${month}-${day}`;
+};
+
 export const processConcursoData = (data: any, anterior?: Concurso): Concurso => {
   const dezenas = data.dezenas.map(Number).sort((a: number, b: number) => a - b);
   const soma = dezenas.reduce((acc: number, curr: number) => acc + curr, 0);
@@ -72,7 +76,7 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
 
   return {
     concurso: Number(data.concurso),
-    data: data.data,
+    data: formatDateForDb(data.data), // Conversão aqui
     dezenas,
     soma,
     pares,
@@ -91,7 +95,7 @@ export const syncLatestResults = async () => {
       .select('concurso')
       .order('concurso', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // Usar maybeSingle para evitar erro se a tabela estiver vazia
 
     const startFrom = lastSaved ? lastSaved.concurso + 1 : 1;
 
@@ -100,7 +104,8 @@ export const syncLatestResults = async () => {
       return { message: 'Já está atualizado. Pontos conferidos.' };
     }
 
-    const limit = 20; // Reduzi o limite para evitar timeouts em conexões lentas
+    // Limite de 20 por vez para evitar timeouts
+    const limit = 20; 
     let count = 0;
 
     for (let i = startFrom; i <= latestNum && count < limit; i++) {
@@ -110,14 +115,15 @@ export const syncLatestResults = async () => {
         .from('concursos')
         .select('*')
         .eq('concurso', i - 1)
-        .single();
+        .maybeSingle();
 
       const processed = processConcursoData(data, anterior || undefined);
-      await supabase.from('concursos').upsert(processed);
+      
+      // Especificar onConflict para garantir que o upsert funcione na coluna 'concurso'
+      await supabase.from('concursos').upsert(processed, { onConflict: 'concurso' });
       count++;
     }
 
-    // Após sincronizar novos concursos, conferir os pontos dos jogos
     await updateAllGamesPoints();
 
     return { message: `Sincronizados ${count} concursos e pontos atualizados!` };
