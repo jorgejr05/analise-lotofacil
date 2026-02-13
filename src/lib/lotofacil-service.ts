@@ -22,6 +22,43 @@ export const fetchConcursoByNumber = async (num: number) => {
   return response.json();
 };
 
+export const calculatePoints = (jogoDezenas: number[], sorteioDezenas: number[]) => {
+  return jogoDezenas.filter(num => sorteioDezenas.includes(num)).length;
+};
+
+export const updateAllGamesPoints = async () => {
+  try {
+    // Buscar jogos que ainda não foram conferidos ou que podem ser conferidos novamente
+    const { data: jogos } = await supabase
+      .from('jogos')
+      .select('*');
+
+    if (!jogos || jogos.length === 0) return;
+
+    for (const jogo of jogos) {
+      // Buscar o resultado do concurso que este jogo estava visando
+      // Se não tiver concurso_referencia, podemos comparar com o último (opcional)
+      const targetConcurso = jogo.concurso_referencia + 1; // Geralmente joga-se no próximo
+
+      const { data: concurso } = await supabase
+        .from('concursos')
+        .select('dezenas')
+        .eq('concurso', targetConcurso)
+        .single();
+
+      if (concurso) {
+        const pontos = calculatePoints(jogo.dezenas, concurso.dezenas);
+        await supabase
+          .from('jogos')
+          .update({ pontos })
+          .eq('id', jogo.id);
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar pontos:', error);
+  }
+};
+
 export const processConcursoData = (data: any, anterior?: Concurso): Concurso => {
   const dezenas = data.dezenas.map(Number).sort((a: number, b: number) => a - b);
   const soma = dezenas.reduce((acc: number, curr: number) => acc + curr, 0);
@@ -58,17 +95,17 @@ export const syncLatestResults = async () => {
 
     const startFrom = lastSaved ? lastSaved.concurso + 1 : 1;
 
-    if (startFrom > latestNum) return { message: 'Já está atualizado' };
+    if (startFrom > latestNum) {
+      await updateAllGamesPoints();
+      return { message: 'Já está atualizado. Pontos conferidos.' };
+    }
 
-    // Para carga inicial, vamos limitar para não estourar o tempo de execução
-    // Em um cenário real, isso seria feito em lotes ou via Edge Function
-    const limit = 50; 
+    const limit = 20; // Reduzi o limite para evitar timeouts em conexões lentas
     let count = 0;
 
     for (let i = startFrom; i <= latestNum && count < limit; i++) {
       const data = await fetchConcursoByNumber(i);
       
-      // Buscar o anterior para calcular repetidas
       const { data: anterior } = await supabase
         .from('concursos')
         .select('*')
@@ -76,12 +113,14 @@ export const syncLatestResults = async () => {
         .single();
 
       const processed = processConcursoData(data, anterior || undefined);
-      
       await supabase.from('concursos').upsert(processed);
       count++;
     }
 
-    return { message: `Sincronizados ${count} concursos` };
+    // Após sincronizar novos concursos, conferir os pontos dos jogos
+    await updateAllGamesPoints();
+
+    return { message: `Sincronizados ${count} concursos e pontos atualizados!` };
   } catch (error) {
     console.error('Erro na sincronização:', error);
     throw error;
