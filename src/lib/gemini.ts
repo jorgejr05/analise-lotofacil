@@ -10,8 +10,12 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
     return "Aguardando ativação da IA: Configure a Secret 'GEMINI_API_KEY' no servidor.";
   }
 
-  // Lista de modelos para tentar (do mais rápido para o mais potente)
-  const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"];
+  // Lista de modelos priorizando a geração 2.0 Flash
+  const modelsToTry = [
+    "gemini-2.0-flash", 
+    "gemini-2.0-flash-exp", 
+    "gemini-1.5-flash"
+  ];
   
   const quentes = Object.entries(stats.freqTotal || {})
     .sort(([,a]: any, [,b]: any) => b - a)
@@ -33,7 +37,7 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
 
   for (const modelName of modelsToTry) {
     try {
-      console.log(`[LotoExpert-IA] Tentando modelo: ${modelName}`);
+      console.log(`[LotoExpert-IA] Tentando o modelo solicitado: ${modelName}`);
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
       const response = await result.response;
@@ -45,7 +49,8 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
       }
     } catch (error: any) {
       console.warn(`[LotoExpert-IA] Falha no modelo ${modelName}:`, error.message);
-      // Se for o último modelo da lista e falhar, cai no catch principal
+      
+      // Se for o último modelo da lista (1.5 flash) e ainda falhar, aí lançamos o erro
       if (modelName === modelsToTry[modelsToTry.length - 1]) {
         throw error;
       }
