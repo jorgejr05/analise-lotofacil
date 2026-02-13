@@ -1,17 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const getApiKey = () => {
-  return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+  // Tenta buscar com e sem o prefixo NEXT_PUBLIC_
+  return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
 };
 
 export const generateGameInsight = async (stats: any, games: number[][]) => {
   const apiKey = getApiKey();
   
-  // Log para debug (aparecerá no console do seu navegador)
-  console.log("[LotoExpert-IA] Tentando conectar com a chave:", apiKey ? "Configurada (Inicia com " + apiKey.substring(0, 4) + "...)" : "Não encontrada");
+  // Log para ajudar você a debugar no console do navegador (F12)
+  console.log("[LotoExpert-IA] Status da Chave:", apiKey ? "Identificada" : "Não encontrada nas Secrets");
 
   if (!apiKey || apiKey === "sua_chave_aqui") {
-    return "Insight em modo de segurança: Seus jogos foram gerados com base em padrões de soma (160-220) e equilíbrio de pares (7-9). Para análises personalizadas por IA, a variável NEXT_PUBLIC_GEMINI_API_KEY deve estar configurada.";
+    return "Insight em modo de segurança: Seus jogos foram gerados com base em padrões de soma (160-220) e equilíbrio de pares (7-9). Para ativar a inteligência artificial completa, configure a Secret 'NEXT_PUBLIC_GEMINI_API_KEY' nas configurações do projeto.";
   }
 
   try {
@@ -47,17 +48,12 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
     
     return text || "Análise concluída. Seus jogos respeitam os filtros de alta probabilidade.";
   } catch (error: any) {
-    // Log detalhado no console do navegador para diagnóstico
-    console.error("[LotoExpert-IA] Erro crítico na API Gemini:", error);
+    console.error("[LotoExpert-IA] Erro na API Gemini:", error);
     
     if (error.message?.includes("API key not valid")) {
-      return "Erro: A chave de API do Gemini é inválida. Por favor, gere uma nova chave no Google AI Studio.";
-    }
-
-    if (error.message?.includes("blocked")) {
-      return "O motor de IA bloqueou a resposta por motivos de segurança. No entanto, seus jogos são matematicamente válidos.";
+      return "Erro: A chave de API configurada é inválida. Verifique sua chave no Google AI Studio.";
     }
     
-    return "O motor de IA encontrou um problema de conexão. No entanto, seus jogos foram validados pelos filtros estatísticos de soma ideal e repetitividade.";
+    return "O motor de IA encontrou um problema de conexão. No entanto, seus jogos foram validados pelos filtros estatísticos de soma ideal.";
   }
 };
