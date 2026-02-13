@@ -17,9 +17,6 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
   const modelsToTry = [
     "gemini-3-flash-preview",             // Versão solicitada (Preview/Futura)
     "gemini-2.5-flash",           // Geração atual de alta performance
-    "gemini-2.0-flash-thinking",  // Versão com raciocínio lógico profundo
-    "gemini-1.5-flash",           // Fallback estável
-    "gemini-1.5-pro"              // Fallback de alta precisão
   ];
   
   const quentes = Object.entries(stats.freqTotal || {})
