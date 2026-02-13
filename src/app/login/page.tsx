@@ -21,7 +21,7 @@ export default function LoginPage() {
               <BarChart3 className="h-6 w-6 md:h-10 md:w-10 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter italic uppercase leading-none">
+          <h1 className="text-2xl md:text-5xl font-black text-slate-900 tracking-tighter italic uppercase leading-none">
             LOTO<span className="text-indigo-600">EXPERT</span>
           </h1>
           <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-slate-400 italic">

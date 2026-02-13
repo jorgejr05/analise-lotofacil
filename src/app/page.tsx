@@ -70,20 +70,20 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
-        <header className="flex flex-col gap-2">
+        <header className="flex flex-col gap-1">
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2 text-slate-400">
               <Clock className="h-3 w-3" />
               <span className="text-[10px] font-bold">{formatDateTime(now)}</span>
             </div>
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
             Visão <span className="text-indigo-600">Geral</span>
           </h1>
           <Button 
             onClick={handleSync} 
             disabled={syncing}
-            className="w-fit mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-8 py-6 shadow-xl shadow-indigo-100 transition-all font-black uppercase italic tracking-wider text-xs"
+            className="w-fit mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
           >
             <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
             {syncing ? 'Atualizando...' : 'Atualizar Dados'}
@@ -133,7 +133,7 @@ export default function Dashboard() {
           <Card className="relative border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white">
             <CardHeader className="bg-slate-900 text-white p-8">
               <CardTitle className="flex justify-between items-center">
-                <span className="text-xl font-black italic uppercase tracking-tighter">Último Sorteio</span>
+                <span className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Último Sorteio</span>
                 <span className="bg-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">
                   {formatDate(stats?.ultimoConcurso?.data)}
                 </span>

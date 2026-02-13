@@ -74,7 +74,7 @@ export default function GeneratorPage() {
       <div className="p-5 md:p-10 max-w-5xl mx-auto space-y-8">
         <header className="space-y-1">
           <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Algoritmo Ativo</span>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
             Motor <span className="text-indigo-600">Inteligente</span>
           </h1>
         </header>
