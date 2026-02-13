@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Hash, Clock, Sparkles } from "lucide-react";
+import { RefreshCw, TrendingUp, Hash, Clock, Sparkles, Flame, Snowflake } from "lucide-react";
 import { toast } from "sonner";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
@@ -57,6 +57,17 @@ export default function Dashboard() {
     );
   }
 
+  // Processar números quentes e frios
+  const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
+    return Object.entries(freqs)
+      .map(([num, freq]) => ({ num: Number(num), freq }))
+      .sort((a, b) => ascending ? a.freq - b.freq : b.freq - a.freq)
+      .slice(0, count);
+  };
+
+  const quentes = stats ? getTopNumbers(stats.freqTotal, 10) : [];
+  const frios = stats ? getTopNumbers(stats.freqTotal, 10, true) : [];
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
@@ -80,7 +91,7 @@ export default function Dashboard() {
           </Button>
         </header>
 
-        {/* Grid de Stats Assimétricos */}
+        {/* Grid de Stats Rápidos */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
             <Hash className="h-5 w-5 text-indigo-500" />
@@ -139,6 +150,67 @@ export default function Dashboard() {
                     className="aspect-square w-full md:w-14 md:h-14 rounded-2xl bg-slate-50 border-2 border-slate-100 text-slate-900 flex items-center justify-center font-black text-lg md:text-xl shadow-inner"
                   >
                     {num.toString().padStart(2, '0')}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Seção de Tendências (Quentes e Frios) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Card Números Quentes */}
+          <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white transition-transform hover:scale-[1.01] duration-500">
+            <CardHeader className="bg-slate-900 text-white p-6">
+              <CardTitle className="flex items-center gap-3">
+                <div className="bg-orange-500 p-2 rounded-xl">
+                  <Flame className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-sm font-black italic uppercase tracking-tighter">Tendência Hot</div>
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Mais sorteados (100 jogos)</div>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {quentes.map((item) => (
+                  <div key={item.num} className="flex flex-col items-center gap-2 group">
+                    <div className="w-12 h-12 rounded-xl bg-orange-50 border-2 border-orange-100 text-orange-700 flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-orange-500 group-hover:text-white transition-all duration-300">
+                      {item.num.toString().padStart(2, '0')}
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">
+                      {item.freq}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card Números Frios */}
+          <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white transition-transform hover:scale-[1.01] duration-500">
+            <CardHeader className="bg-slate-900 text-white p-6">
+              <CardTitle className="flex items-center gap-3">
+                <div className="bg-indigo-500 p-2 rounded-xl">
+                  <Snowflake className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-sm font-black italic uppercase tracking-tighter">Tendência Cold</div>
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Menos sorteados (100 jogos)</div>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {frios.map((item) => (
+                  <div key={item.num} className="flex flex-col items-center gap-2 group">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border-2 border-indigo-100 text-indigo-700 flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300">
+                      {item.num.toString().padStart(2, '0')}
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">
+                      {item.freq}%
+                    </span>
                   </div>
                 ))}
               </div>
