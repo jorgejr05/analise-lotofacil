@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// A chave deve ser configurada nas variáveis de ambiente do projeto
 const getApiKey = () => {
   return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
 };
@@ -8,15 +7,17 @@ const getApiKey = () => {
 export const generateGameInsight = async (stats: any, games: number[][]) => {
   const apiKey = getApiKey();
   
+  // Log para debug (aparecerá no console do seu navegador)
+  console.log("[LotoExpert-IA] Tentando conectar com a chave:", apiKey ? "Configurada (Inicia com " + apiKey.substring(0, 4) + "...)" : "Não encontrada");
+
   if (!apiKey || apiKey === "sua_chave_aqui") {
-    return "Insight em modo de segurança: Seus jogos foram gerados com base em padrões de soma (160-220) e equilíbrio de pares (7-9). Para análises personalizadas por IA, configure a variável NEXT_PUBLIC_GEMINI_API_KEY.";
+    return "Insight em modo de segurança: Seus jogos foram gerados com base em padrões de soma (160-220) e equilíbrio de pares (7-9). Para análises personalizadas por IA, a variável NEXT_PUBLIC_GEMINI_API_KEY deve estar configurada.";
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Preparar dados simplificados para o prompt
     const quentes = Object.entries(stats.freqTotal)
       .sort(([,a]: any, [,b]: any) => b - a)
       .slice(0, 5)
@@ -41,17 +42,22 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
     `;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await result.response;
+    const text = response.text();
     
-    return text || "Análise concluída com sucesso baseada em filtros de alta probabilidade.";
+    return text || "Análise concluída. Seus jogos respeitam os filtros de alta probabilidade.";
   } catch (error: any) {
-    console.error("Erro na API Gemini:", error);
+    // Log detalhado no console do navegador para diagnóstico
+    console.error("[LotoExpert-IA] Erro crítico na API Gemini:", error);
     
-    // Se for erro de quota ou chave inválida, retornar mensagem específica
     if (error.message?.includes("API key not valid")) {
-      return "Erro: A chave de API do Gemini configurada é inválida. Verifique suas credenciais no Google AI Studio.";
+      return "Erro: A chave de API do Gemini é inválida. Por favor, gere uma nova chave no Google AI Studio.";
+    }
+
+    if (error.message?.includes("blocked")) {
+      return "O motor de IA bloqueou a resposta por motivos de segurança. No entanto, seus jogos são matematicamente válidos.";
     }
     
-    return "O motor de IA encontrou um problema técnico. No entanto, seus jogos foram validados pelos filtros estatísticos de soma ideal (160-220) e repetitividade histórica.";
+    return "O motor de IA encontrou um problema de conexão. No entanto, seus jogos foram validados pelos filtros estatísticos de soma ideal e repetitividade.";
   }
 };
