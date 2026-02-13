@@ -13,14 +13,14 @@ export const Navigation = () => {
   if (pathname === "/login") return null;
 
   const menuItems = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Painel", href: "/", icon: LayoutDashboard },
     { name: "Gerador", href: "/generator", icon: Dices },
     { name: "Meus Jogos", href: "/my-games", icon: History },
   ];
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* Sidebar Desktop */}
       <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r p-6 z-50">
         <div className="mb-10 px-2">
           <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
@@ -65,7 +65,7 @@ export const Navigation = () => {
         </div>
       </nav>
 
-      {/* Mobile Floating Glass Navigation */}
+      {/* Navegação Flutuante Mobile */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50">
         <nav className="bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] rounded-[2.5rem] p-2 flex justify-between items-center">
           {menuItems.map((item) => {

@@ -26,7 +26,7 @@ export default function Dashboard() {
         await syncLatestResults();
         refresh();
       } catch (e) {
-        console.error("Auto-sync falhou", e);
+        console.error("Sincronização automática falhou", e);
       }
     };
     autoSync();
@@ -57,7 +57,6 @@ export default function Dashboard() {
     );
   }
 
-  // Processar números quentes e frios
   const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
     return Object.entries(freqs)
       .map(([num, freq]) => ({ num: Number(num), freq }))
@@ -91,7 +90,6 @@ export default function Dashboard() {
           </Button>
         </header>
 
-        {/* Grid de Stats Rápidos */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
             <Hash className="h-5 w-5 text-indigo-500" />
@@ -115,7 +113,7 @@ export default function Dashboard() {
               <div className="text-2xl font-black tracking-tighter">
                 {Math.round(stats?.paresMedia)}<span className="text-slate-300 text-lg">P</span>
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ideal Pares</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pares Ideais</p>
             </div>
           </div>
 
@@ -130,7 +128,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Resultado Principal */}
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[3rem] blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
           <Card className="relative border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white">
@@ -157,9 +154,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Seção de Tendências (Quentes e Frios) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Card Números Quentes */}
           <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white transition-transform hover:scale-[1.01] duration-500">
             <CardHeader className="bg-slate-900 text-white p-6">
               <CardTitle className="flex items-center gap-3">
@@ -167,7 +162,7 @@ export default function Dashboard() {
                   <Flame className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <div className="text-sm font-black italic uppercase tracking-tighter">Tendência Hot</div>
+                  <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Quentes</div>
                   <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Mais sorteados (100 jogos)</div>
                 </div>
               </CardTitle>
@@ -188,7 +183,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Card Números Frios */}
           <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white transition-transform hover:scale-[1.01] duration-500">
             <CardHeader className="bg-slate-900 text-white p-6">
               <CardTitle className="flex items-center gap-3">
@@ -196,7 +190,7 @@ export default function Dashboard() {
                   <Snowflake className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <div className="text-sm font-black italic uppercase tracking-tighter">Tendência Cold</div>
+                  <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Frios</div>
                   <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Menos sorteados (100 jogos)</div>
                 </div>
               </CardTitle>

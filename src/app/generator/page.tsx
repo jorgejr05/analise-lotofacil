@@ -29,9 +29,9 @@ export default function GeneratorPage() {
       
       const aiInsight = await generateGameInsight(stats, games);
       setInsight(aiInsight);
-      toast.success("Jogos gerados!");
+      toast.success("Jogos gerados com sucesso!");
     } catch (error) {
-      toast.error("Erro ao gerar jogos");
+      toast.error("Falha ao gerar jogos");
     } finally {
       setIsGenerating(false);
     }
@@ -44,7 +44,7 @@ export default function GeneratorPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error("Entre para salvar");
+        toast.error("Acesse sua conta para salvar");
         return;
       }
 
@@ -57,11 +57,11 @@ export default function GeneratorPage() {
       const { error } = await supabase.from('jogos').insert(gamesToSave);
       if (error) throw error;
 
-      toast.success("Salvo no histórico!");
+      toast.success("Jogos salvos no histórico!");
       setGeneratedGames([]);
       setInsight("");
     } catch (error) {
-      toast.error("Erro ao salvar");
+      toast.error("Erro ao salvar jogos");
     } finally {
       setIsSaving(false);
     }
@@ -107,7 +107,7 @@ export default function GeneratorPage() {
                   <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                     {generatedGames.map((game, idx) => (
                       <div key={idx} className="p-5 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-2 opacity-5 text-[8px] font-black uppercase">Prob: 84%</div>
+                        <div className="absolute top-0 right-0 p-2 opacity-5 text-[8px] font-black uppercase">Probabilidade: 84%</div>
                         <div className="grid grid-cols-5 gap-2">
                           {game.map(num => (
                             <span key={num} className="aspect-square flex items-center justify-center bg-white border border-indigo-100 text-indigo-700 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
@@ -137,7 +137,7 @@ export default function GeneratorPage() {
                 <Card className="border-none shadow-2xl rounded-[2rem] bg-indigo-950 text-white overflow-hidden">
                   <CardHeader className="bg-indigo-900/50 p-6">
                     <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 text-indigo-300">
-                      <BrainCircuit className="h-4 w-4" /> IA Analysis
+                      <BrainCircuit className="h-4 w-4" /> Análise por IA
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-8">
