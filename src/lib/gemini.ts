@@ -15,7 +15,7 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
    * Agora incluindo a versão 3 Flash conforme solicitado.
    */
   const modelsToTry = [
-    "gemini-3-flash",             // Versão solicitada (Preview/Futura)
+    "gemini-3-flash-preview",             // Versão solicitada (Preview/Futura)
     "gemini-2.0-flash",           // Geração atual de alta performance
     "gemini-2.0-flash-thinking",  // Versão com raciocínio lógico profundo
     "gemini-1.5-flash",           // Fallback estável
