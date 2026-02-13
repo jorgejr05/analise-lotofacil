@@ -61,10 +61,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black tracking-[0.2em] text-indigo-500 uppercase bg-indigo-50 px-3 py-1 rounded-full">
-              Live Stats
-            </span>
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-2 text-slate-400">
               <Clock className="h-3 w-3" />
               <span className="text-[10px] font-bold">{formatDateTime(now)}</span>
