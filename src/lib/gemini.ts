@@ -3,47 +3,54 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const generateGameInsight = async (stats: any, games: number[][]) => {
-  // Agora rodando no servidor, buscamos a chave privada
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    console.error("[LotoExpert-IA] GEMINI_API_KEY não encontrada nas variáveis de ambiente do servidor.");
-    return "Configuração pendente: A chave GEMINI_API_KEY não foi encontrada no servidor. Verifique as Secrets do projeto.";
+    console.error("[LotoExpert-IA] GEMINI_API_KEY não configurada.");
+    return "Aguardando ativação da IA: Configure a Secret 'GEMINI_API_KEY' no servidor.";
   }
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // Lista de modelos para tentar (do mais rápido para o mais potente)
+  const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"];
+  
+  const quentes = Object.entries(stats.freqTotal || {})
+    .sort(([,a]: any, [,b]: any) => b - a)
+    .slice(0, 5)
+    .map(([num]) => num)
+    .join(", ");
 
-    const quentes = Object.entries(stats.freqTotal || {})
-      .sort(([,a]: any, [,b]: any) => b - a)
-      .slice(0, 5)
-      .map(([num]) => num)
-      .join(", ");
+  const prompt = `
+    Analise estes 3 jogos da Lotofácil (base 100 concursos):
+    - Soma média histórica: ${Math.round(stats.somaMedia)}
+    - Dezenas frequentes: ${quentes}
+    - Jogos sugeridos: ${JSON.stringify(games)}
+    
+    Explique por que esses jogos são equilibrados (fale sobre soma e dezenas repetidas). 
+    Seja breve (2 parágrafos). Use Português do Brasil.
+  `;
 
-    const prompt = `
-      Analise estes 3 jogos da Lotofácil (estatísticas baseadas em 100 concursos):
-      - Soma média: ${Math.round(stats.somaMedia)}
-      - Números mais frequentes: ${quentes}
-      - Jogos sugeridos: ${JSON.stringify(games)}
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  for (const modelName of modelsToTry) {
+    try {
+      console.log(`[LotoExpert-IA] Tentando modelo: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
       
-      Explique a lógica técnica desses jogos em 2 parágrafos curtos. Foque na probabilidade e equilíbrio. 
-      Use Português do Brasil. Seja direto e profissional.
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    return text || "Análise concluída com sucesso.";
-
-  } catch (error: any) {
-    console.error("[LotoExpert-IA] Erro no Servidor:", error.message);
-    
-    if (error.message?.includes("location not supported")) {
-      return "A API do Gemini ainda não está disponível na sua região de hospedagem. Os jogos seguem validados por filtros estatísticos.";
+      if (text) {
+        console.log(`[LotoExpert-IA] Sucesso com o modelo: ${modelName}`);
+        return text;
+      }
+    } catch (error: any) {
+      console.warn(`[LotoExpert-IA] Falha no modelo ${modelName}:`, error.message);
+      // Se for o último modelo da lista e falhar, cai no catch principal
+      if (modelName === modelsToTry[modelsToTry.length - 1]) {
+        throw error;
+      }
     }
-
-    return "O servidor de IA está processando muitas requisições. Tente gerar novamente em alguns instantes.";
   }
+
+  return "Análise técnica concluída via filtros estatísticos.";
 };
