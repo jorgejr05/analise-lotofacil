@@ -5,13 +5,34 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Hash, Calendar } from "lucide-react";
+import { RefreshCw, TrendingUp, Hash, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { MadeWithDyad } from "@/components/made-with-dyad";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 export default function Dashboard() {
   const { stats, loading, refresh } = useLotofacilStats();
   const [syncing, setSyncing] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  // Relógio em tempo real
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auto-sincronização ao carregar
+  useEffect(() => {
+    const autoSync = async () => {
+      try {
+        await syncLatestResults();
+        refresh();
+      } catch (e) {
+        console.error("Auto-sync falhou", e);
+      }
+    };
+    autoSync();
+  }, [refresh]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -20,14 +41,19 @@ export default function Dashboard() {
       toast.success(res.message);
       refresh();
     } catch (error) {
-      toast.error("Erro ao sincronizar dados");
+      toast.error("Erro ao sincronizar dados. Verifique sua conexão.");
     } finally {
       setSyncing(false);
     }
   };
 
   if (loading && !stats) {
-    return <div className="flex items-center justify-center min-h-screen">Carregando dados...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
+        <p className="text-slate-500 font-medium">Carregando inteligência estatística...</p>
+      </div>
+    );
   }
 
   return (
@@ -35,16 +61,19 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Lotofácil Probabilidades</h1>
-            <p className="text-slate-500">Análise inteligente e geração de jogos</p>
+            <h1 className="text-3xl font-bold text-slate-900">Dashboard LotoExpert</h1>
+            <div className="flex items-center gap-2 text-slate-500 mt-1">
+              <Clock className="h-4 w-4 text-indigo-500" />
+              <span className="text-sm font-medium">{formatDateTime(now)}</span>
+            </div>
           </div>
           <Button 
             onClick={handleSync} 
             disabled={syncing}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6 shadow-lg shadow-indigo-200 transition-all hover:scale-105"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            Sincronizar Dados
+            {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
           </Button>
         </header>
 
@@ -59,7 +88,7 @@ export default function Dashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{stats?.ultimoConcurso?.concurso || '---'}</div>
               <p className="text-xs text-slate-400 flex items-center mt-1">
-                <Calendar className="mr-1 h-3 w-3" /> {stats?.ultimoConcurso?.data || '---'}
+                <Calendar className="mr-1 h-3 w-3" /> {formatDate(stats?.ultimoConcurso?.data)}
               </p>
             </CardContent>
           </Card>
@@ -72,21 +101,21 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{Math.round(stats?.somaMedia || 0)}</div>
-              <p className="text-xs text-slate-400 mt-1">Últimos 100 concursos</p>
+              <p className="text-xs text-slate-400 mt-1">Base: Últimos 100 concursos</p>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-sm bg-white">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-500 flex items-center">
-                <Hash className="mr-2 h-4 w-4 text-orange-500" /> Pares/Ímpares
+                <Hash className="mr-2 h-4 w-4 text-orange-500" /> Pares / Ímpares
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {Math.round(stats?.paresMedia)} / {15 - Math.round(stats?.paresMedia)}
               </div>
-              <p className="text-xs text-slate-400 mt-1">Distribuição média</p>
+              <p className="text-xs text-slate-400 mt-1">Distribuição média ideal</p>
             </CardContent>
           </Card>
 
@@ -108,7 +137,7 @@ export default function Dashboard() {
           <CardHeader className="bg-indigo-900 text-white">
             <CardTitle className="flex justify-between items-center">
               <span>Dezenas Sorteadas - Concurso {stats?.ultimoConcurso?.concurso}</span>
-              <span className="text-sm font-normal opacity-80">{stats?.ultimoConcurso?.data}</span>
+              <span className="text-sm font-normal opacity-80">{formatDate(stats?.ultimoConcurso?.data)}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-8 bg-white">

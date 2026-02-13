@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { History, Trophy, Calendar, Hash } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function MyGamesPage() {
   const [jogos, setJogos] = useState<any[]>([]);
@@ -57,7 +58,7 @@ export default function MyGamesPage() {
                         <Hash className="h-3 w-3 mr-1" /> Concurso {jogo.concurso_referencia}
                       </Badge>
                       <span className="text-xs text-slate-400 flex items-center">
-                        <Calendar className="h-3 w-3 mr-1" /> {new Date(jogo.criado_em).toLocaleDateString()}
+                        <Calendar className="h-3 w-3 mr-1" /> {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -87,5 +88,3 @@ export default function MyGamesPage() {
     </div>
   );
 }
-
-const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
