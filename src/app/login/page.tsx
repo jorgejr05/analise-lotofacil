@@ -51,6 +51,20 @@ export default function LoginPage() {
                   loading_button_label: 'Criando conta...',
                   link_text: 'Não tem uma conta? Cadastre-se',
                 },
+                forgotten_password: {
+                  email_label: 'E-mail',
+                  password_label: 'Senha',
+                  email_input_placeholder: 'Seu e-mail',
+                  button_label: 'Enviar instruções de recuperação',
+                  loading_button_label: 'Enviando...',
+                  link_text: 'Esqueceu sua senha?',
+                },
+                update_password: {
+                  password_label: 'Nova senha',
+                  password_input_placeholder: 'Sua nova senha',
+                  button_label: 'Atualizar senha',
+                  loading_button_label: 'Atualizando...',
+                },
               }
             }}
           />
