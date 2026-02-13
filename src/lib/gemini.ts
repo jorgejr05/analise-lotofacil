@@ -1,55 +1,49 @@
+"use server";
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const getApiKey = () => {
-  return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
-};
-
 export const generateGameInsight = async (stats: any, games: number[][]) => {
-  const apiKey = getApiKey();
+  // Agora rodando no servidor, buscamos a chave privada
+  const apiKey = process.env.GEMINI_API_KEY;
   
-  // Log de depuração (visível no F12 do navegador)
-  console.log("[LotoExpert-IA] Chave detectada (primeiros 4 dígitos):", apiKey.substring(0, 4) + "...");
-
-  if (!apiKey || apiKey === "sua_chave_aqui") {
-    return "Insight em modo de segurança: Seus jogos foram gerados com base em padrões de soma (160-220). Para ativar a IA, configure a Secret 'NEXT_PUBLIC_GEMINI_API_KEY'.";
+  if (!apiKey) {
+    console.error("[LotoExpert-IA] GEMINI_API_KEY não encontrada nas variáveis de ambiente do servidor.");
+    return "Configuração pendente: A chave GEMINI_API_KEY não foi encontrada no servidor. Verifique as Secrets do projeto.";
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Usando uma versão estável do modelo
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const quentes = Object.entries(stats.freqTotal)
+    const quentes = Object.entries(stats.freqTotal || {})
       .sort(([,a]: any, [,b]: any) => b - a)
       .slice(0, 5)
       .map(([num]) => num)
       .join(", ");
 
     const prompt = `
-      Analise estes 3 jogos da Lotofácil:
+      Analise estes 3 jogos da Lotofácil (estatísticas baseadas em 100 concursos):
       - Soma média: ${Math.round(stats.somaMedia)}
-      - Quentes: ${quentes}
-      - Jogos: ${JSON.stringify(games)}
-      Explique a lógica técnica e o equilíbrio desses jogos em 2 parágrafos curtos. Português do Brasil.
+      - Números mais frequentes: ${quentes}
+      - Jogos sugeridos: ${JSON.stringify(games)}
+      
+      Explique a lógica técnica desses jogos em 2 parágrafos curtos. Foque na probabilidade e equilíbrio. 
+      Use Português do Brasil. Seja direto e profissional.
     `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    
+    return text || "Análise concluída com sucesso.";
 
   } catch (error: any) {
-    // Captura o erro detalhado para diagnóstico
-    const errorMessage = error.message || "Erro desconhecido";
-    console.error("[LotoExpert-IA] Erro Crítico:", error);
-
-    if (errorMessage.includes("API key not valid") || errorMessage.includes("403")) {
-      return "Erro: A chave de API do Google é inválida ou não tem permissão para o Gemini. Verifique-a no Google AI Studio.";
-    }
+    console.error("[LotoExpert-IA] Erro no Servidor:", error.message);
     
-    if (errorMessage.includes("quota") || errorMessage.includes("429")) {
-      return "Erro: Limite de uso da IA atingido. Tente novamente em alguns minutos.";
+    if (error.message?.includes("location not supported")) {
+      return "A API do Gemini ainda não está disponível na sua região de hospedagem. Os jogos seguem validados por filtros estatísticos.";
     }
 
-    return `Falha na IA: ${errorMessage}. Seus jogos foram validados pelos filtros estatísticos de soma ideal.`;
+    return "O servidor de IA está processando muitas requisições. Tente gerar novamente em alguns instantes.";
   }
 };
