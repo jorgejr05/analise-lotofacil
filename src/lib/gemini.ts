@@ -12,12 +12,12 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
 
   /** 
    * Lista de modelos em ordem de prioridade. 
-   * Incluindo 2.0 Flash como padrão de alta performance e 
-   * deixando o gancho para versões futuras.
+   * Agora incluindo a versão 3 Flash conforme solicitado.
    */
   const modelsToTry = [
-    "gemini-2.0-flash",           // O mais rápido e moderno atual
-    "gemini-2.0-flash-thinking",  // Versão com raciocínio aprimorado
+    "gemini-3-flash",             // Versão solicitada (Preview/Futura)
+    "gemini-2.0-flash",           // Geração atual de alta performance
+    "gemini-2.0-flash-thinking",  // Versão com raciocínio lógico profundo
     "gemini-1.5-flash",           // Fallback estável
     "gemini-1.5-pro"              // Fallback de alta precisão
   ];
@@ -42,18 +42,18 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
 
   for (const modelName of modelsToTry) {
     try {
-      console.log(`[LotoExpert-IA] Solicitando processamento: ${modelName}`);
+      console.log(`[LotoExpert-IA] Tentando processamento via: ${modelName}`);
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
       if (text) {
-        console.log(`[LotoExpert-IA] Inteligência ativa via: ${modelName}`);
+        console.log(`[LotoExpert-IA] Sucesso! Respondendo via: ${modelName}`);
         return text;
       }
     } catch (error: any) {
-      console.warn(`[LotoExpert-IA] Modelo ${modelName} indisponível:`, error.message);
+      console.warn(`[LotoExpert-IA] Modelo ${modelName} ainda não disponível para sua chave:`, error.message);
       
       // Se for o último modelo da lista, reportamos o erro final
       if (modelName === modelsToTry[modelsToTry.length - 1]) {
@@ -62,5 +62,5 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
     }
   }
 
-  return "Análise estatística concluída. (IA em modo de espera)";
+  return "Análise estatística concluída. (IA aguardando processamento)";
 };
