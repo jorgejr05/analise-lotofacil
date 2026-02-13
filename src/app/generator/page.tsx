@@ -7,8 +7,9 @@ import { generateGameInsight } from "@/lib/gemini";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dices, Sparkles, Save, Loader2, BrainCircuit } from "lucide-react";
+import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function GeneratorPage() {
   const { stats, loading } = useLotofacilStats();
@@ -28,7 +29,7 @@ export default function GeneratorPage() {
       
       const aiInsight = await generateGameInsight(stats, games);
       setInsight(aiInsight);
-      toast.success("Jogos gerados com sucesso!");
+      toast.success("Jogos gerados!");
     } catch (error) {
       toast.error("Erro ao gerar jogos");
     } finally {
@@ -43,7 +44,7 @@ export default function GeneratorPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error("Você precisa estar logado para salvar jogos");
+        toast.error("Entre para salvar");
         return;
       }
 
@@ -56,116 +57,98 @@ export default function GeneratorPage() {
       const { error } = await supabase.from('jogos').insert(gamesToSave);
       if (error) throw error;
 
-      toast.success("Jogos salvos no seu histórico!");
+      toast.success("Salvo no histórico!");
       setGeneratedGames([]);
       setInsight("");
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao salvar jogos");
+      toast.error("Erro ao salvar");
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Carregando motor estatístico...</div>;
+  if (loading) return null;
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold text-slate-900">Gerador Inteligente</h1>
-        <p className="text-slate-500">Algoritmo probabilístico + Insight de IA</p>
-      </header>
+    <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
+      <div className="p-5 md:p-10 max-w-5xl mx-auto space-y-8">
+        <header className="space-y-1">
+          <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Algoritmo Ativo</span>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+            Motor <span className="text-indigo-600">Inteligente</span>
+          </h1>
+        </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-none shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Dices className="h-5 w-5 text-indigo-600" /> Jogos Sugeridos
-              </CardTitle>
-              <Button 
-                onClick={handleGenerate} 
-                disabled={isGenerating}
-                className="bg-indigo-600 hover:bg-indigo-700"
-              >
-                {isGenerating ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                Gerar 3 Jogos
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {generatedGames.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 border-2 border-dashed rounded-xl">
-                  Clique em gerar para criar novos jogos baseados em estatísticas.
-                </div>
-              ) : (
-                generatedGames.map((game, idx) => (
-                  <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="flex flex-wrap gap-2">
-                      {game.map(num => (
-                        <span key={num} className="w-8 h-8 flex items-center justify-center bg-white border border-indigo-200 text-indigo-700 rounded-full text-sm font-bold shadow-sm">
-                          {num.toString().padStart(2, '0')}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-
-              {generatedGames.length > 0 && (
-                <Button 
-                  onClick={handleSaveGames} 
-                  disabled={isSaving}
-                  variant="outline" 
-                  className="w-full mt-4 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                >
-                  {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
-                  Salvar Jogos no Histórico
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {insight && (
-            <Card className="border-none shadow-md bg-indigo-900 text-white">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BrainCircuit className="h-5 w-5 text-indigo-300" /> Análise do Especialista (IA)
+        <div className="grid grid-cols-1 gap-8">
+          <div className="space-y-6">
+            <Card className="border-none shadow-2xl rounded-[2rem] bg-white overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 p-6">
+                <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
+                  <Dices className="h-5 w-5 text-indigo-600" /> Sugestões
                 </CardTitle>
+                <Button 
+                  onClick={handleGenerate} 
+                  disabled={isGenerating}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 h-12 shadow-lg shadow-indigo-100 font-black uppercase italic text-[10px] tracking-widest"
+                >
+                  {isGenerating ? <Loader2 className="animate-spin h-4 w-4" /> : <Rocket className="mr-2 h-4 w-4" />}
+                  Gerar Agora
+                </Button>
               </CardHeader>
-              <CardContent>
-                <p className="text-indigo-100 leading-relaxed whitespace-pre-wrap">
-                  {insight}
-                </p>
+              <CardContent className="p-6 space-y-4">
+                {generatedGames.length === 0 ? (
+                  <div className="py-20 text-center flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
+                      <Sparkles className="h-8 w-8 text-slate-200" />
+                    </div>
+                    <p className="text-slate-400 font-bold text-sm uppercase italic">Aguardando comando...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                    {generatedGames.map((game, idx) => (
+                      <div key={idx} className="p-5 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-2 opacity-5 text-[8px] font-black uppercase">Prob: 84%</div>
+                        <div className="grid grid-cols-5 gap-2">
+                          {game.map(num => (
+                            <span key={num} className="aspect-square flex items-center justify-center bg-white border border-indigo-100 text-indigo-700 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
+                              {num.toString().padStart(2, '0')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <Button 
+                      onClick={handleSaveGames} 
+                      disabled={isSaving}
+                      variant="outline" 
+                      className="w-full mt-4 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50"
+                    >
+                      {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
+                      Fixar no Histórico
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
-        </div>
 
-        <div className="space-y-6">
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-slate-500">Filtros Aplicados</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Pares / Ímpares</span>
-                <span className="text-sm font-bold text-indigo-600">7-9 / 6-8</span>
+            {insight && (
+              <div className="animate-in fade-in zoom-in duration-700">
+                <Card className="border-none shadow-2xl rounded-[2rem] bg-indigo-950 text-white overflow-hidden">
+                  <CardHeader className="bg-indigo-900/50 p-6">
+                    <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 text-indigo-300">
+                      <BrainCircuit className="h-4 w-4" /> IA Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <p className="text-indigo-100 text-sm leading-relaxed font-medium italic">
+                      {insight}
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Soma Total</span>
-                <span className="text-sm font-bold text-indigo-600">160 - 220</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Repetidas Anterior</span>
-                <span className="text-sm font-bold text-indigo-600">8 - 10</span>
-              </div>
-              <div className="pt-4 border-t">
-                <p className="text-xs text-slate-400 italic">
-                  Os jogos são gerados priorizando dezenas com maior score de frequência e menor atraso, respeitando os padrões matemáticos mais comuns da Lotofácil.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>

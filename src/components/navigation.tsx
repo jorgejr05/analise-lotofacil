@@ -19,48 +19,86 @@ export const Navigation = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t md:relative md:border-t-0 md:border-r md:w-64 md:min-h-screen p-4 z-50 flex flex-col">
-      <div className="hidden md:block mb-8 px-2">
-        <h2 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
-          <BarChart3 className="h-6 w-6" /> LotoExpert
-        </h2>
-        {user && (
-          <p className="text-[10px] text-slate-400 truncate mt-1">{user.email}</p>
-        )}
-      </div>
-      
-      <ul className="flex md:flex-col justify-around md:justify-start gap-2 flex-1">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-          return (
-            <li key={item.href} className="flex-1 md:flex-none">
+    <>
+      {/* Desktop Sidebar */}
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r p-6 z-50">
+        <div className="mb-10 px-2">
+          <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
+            <BarChart3 className="h-7 w-7" /> LOTOEXPERT
+          </h2>
+          {user && (
+            <p className="text-[10px] text-slate-400 truncate mt-1 font-medium uppercase tracking-widest">{user.email}</p>
+          )}
+        </div>
+        
+        <ul className="space-y-2 flex-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-5 py-4 transition-all duration-300",
+                    isActive 
+                      ? "bg-indigo-600 text-white rounded-tr-3xl rounded-bl-3xl shadow-lg shadow-indigo-100 font-bold translate-x-1" 
+                      : "text-slate-500 hover:bg-slate-50 rounded-xl"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-sm">{item.name}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="pt-6 border-t border-slate-100">
+          <button
+            onClick={() => signOut()}
+            className="flex items-center gap-3 px-5 py-4 w-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-300 group"
+          >
+            <LogOut className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-bold uppercase tracking-wider">Sair</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Floating Glass Navigation */}
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50">
+        <nav className="bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] rounded-[2.5rem] p-2 flex justify-between items-center">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
               <Link
+                key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col md:flex-row items-center gap-3 px-4 py-3 rounded-xl transition-all",
-                  isActive 
-                    ? "bg-indigo-50 text-indigo-600 font-semibold" 
-                    : "text-slate-500 hover:bg-slate-50"
+                  "flex flex-col items-center justify-center py-3 px-5 transition-all duration-300 relative",
+                  isActive ? "text-indigo-600" : "text-slate-400"
                 )}
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-xs md:text-sm">{item.name}</span>
+                {isActive && (
+                  <div className="absolute inset-0 bg-indigo-50/50 rounded-2xl -z-10 animate-in fade-in zoom-in duration-300" />
+                )}
+                <Icon className={cn("h-6 w-6 mb-1", isActive && "stroke-[2.5px]")} />
+                <span className={cn("text-[10px] font-bold uppercase tracking-tighter", isActive ? "opacity-100" : "opacity-0 h-0 overflow-hidden")}>
+                  {item.name}
+                </span>
               </Link>
-            </li>
-          );
-        })}
-      </ul>
-
-      <div className="hidden md:block pt-4 border-t">
-        <button
-          onClick={() => signOut()}
-          className="flex items-center gap-3 px-4 py-3 w-full text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-        >
-          <LogOut className="h-5 w-5" />
-          <span className="text-sm font-medium">Sair</span>
-        </button>
+            );
+          })}
+          
+          <button
+            onClick={() => signOut()}
+            className="flex flex-col items-center justify-center py-3 px-5 text-slate-400 active:text-rose-500 transition-colors"
+          >
+            <LogOut className="h-6 w-6" />
+          </button>
+        </nav>
       </div>
-    </nav>
+    </>
   );
 };

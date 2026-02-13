@@ -5,23 +5,21 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Hash, Calendar, Clock } from "lucide-react";
+import { RefreshCw, TrendingUp, Hash, Calendar, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MadeWithDyad } from "@/components/made-with-dyad";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 export default function Dashboard() {
   const { stats, loading, refresh } = useLotofacilStats();
   const [syncing, setSyncing] = useState(false);
   const [now, setNow] = useState(new Date());
 
-  // Relógio em tempo real
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-sincronização ao carregar
   useEffect(() => {
     const autoSync = async () => {
       try {
@@ -41,7 +39,7 @@ export default function Dashboard() {
       toast.success(res.message);
       refresh();
     } catch (error) {
-      toast.error("Erro ao sincronizar dados. Verifique sua conexão.");
+      toast.error("Erro ao sincronizar dados.");
     } finally {
       setSyncing(false);
     }
@@ -49,169 +47,107 @@ export default function Dashboard() {
 
   if (loading && !stats) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
-        <p className="text-slate-500 font-medium">Carregando inteligência estatística...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white">
+        <div className="relative">
+          <RefreshCw className="h-12 w-12 animate-spin text-indigo-600 opacity-20" />
+          <Sparkles className="h-6 w-6 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+        </div>
+        <p className="text-slate-900 font-black tracking-tighter text-xl italic uppercase">Iniciando Motor...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Dashboard LotoExpert</h1>
-            <div className="flex items-center gap-2 text-slate-500 mt-1">
-              <Clock className="h-4 w-4 text-indigo-500" />
-              <span className="text-sm font-medium">{formatDateTime(now)}</span>
+    <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
+      <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
+        <header className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black tracking-[0.2em] text-indigo-500 uppercase bg-indigo-50 px-3 py-1 rounded-full">
+              Live Stats
+            </span>
+            <div className="flex items-center gap-2 text-slate-400">
+              <Clock className="h-3 w-3" />
+              <span className="text-[10px] font-bold">{formatDateTime(now)}</span>
             </div>
           </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
+            Visão <span className="text-indigo-600">Geral</span>
+          </h1>
           <Button 
             onClick={handleSync} 
             disabled={syncing}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6 shadow-lg shadow-indigo-200 transition-all hover:scale-105"
+            className="w-fit mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-8 py-6 shadow-xl shadow-indigo-100 transition-all font-black uppercase italic tracking-wider text-xs"
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
+            <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
+            {syncing ? 'Atualizando...' : 'Atualizar Dados'}
           </Button>
         </header>
 
-        {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-none shadow-sm bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500 flex items-center">
-                <Hash className="mr-2 h-4 w-4 text-indigo-500" /> Último Concurso
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.ultimoConcurso?.concurso || '---'}</div>
-              <p className="text-xs text-slate-400 flex items-center mt-1">
-                <Calendar className="mr-1 h-3 w-3" /> {formatDate(stats?.ultimoConcurso?.data)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500 flex items-center">
-                <TrendingUp className="mr-2 h-4 w-4 text-emerald-500" /> Soma Média
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{Math.round(stats?.somaMedia || 0)}</div>
-              <p className="text-xs text-slate-400 mt-1">Base: Últimos 100 concursos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500 flex items-center">
-                <Hash className="mr-2 h-4 w-4 text-orange-500" /> Pares / Ímpares
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {Math.round(stats?.paresMedia)} / {15 - Math.round(stats?.paresMedia)}
-              </div>
-              <p className="text-xs text-slate-400 mt-1">Distribuição média ideal</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500 flex items-center">
-                <TrendingUp className="mr-2 h-4 w-4 text-rose-500" /> Repetidas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">9.2</div>
-              <p className="text-xs text-slate-400 mt-1">Média do concurso anterior</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Último Resultado */}
-        <Card className="border-none shadow-md overflow-hidden">
-          <CardHeader className="bg-indigo-900 text-white">
-            <CardTitle className="flex justify-between items-center">
-              <span>Dezenas Sorteadas - Concurso {stats?.ultimoConcurso?.concurso}</span>
-              <span className="text-sm font-normal opacity-80">{formatDate(stats?.ultimoConcurso?.data)}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-8 bg-white">
-            <div className="flex flex-wrap gap-3 justify-center">
-              {stats?.ultimoConcurso?.dezenas.map((num: number) => (
-                <div 
-                  key={num} 
-                  className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg shadow-sm border border-indigo-200"
-                >
-                  {num.toString().padStart(2, '0')}
-                </div>
-              ))}
+        {/* Grid de Stats Assimétricos */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
+            <Hash className="h-5 w-5 text-indigo-500" />
+            <div>
+              <div className="text-2xl font-black tracking-tighter">{stats?.ultimoConcurso?.concurso}</div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Concurso</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Números Quentes e Atrasados */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Números Mais Frequentes (Quentes)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(stats?.freqTotal || {})
-                  .sort(([, a]: any, [, b]: any) => b - a)
-                  .slice(0, 5)
-                  .map(([num, freq]: any) => (
-                    <div key={num} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold">
-                        {num.padStart(2, '0')}
-                      </div>
-                      <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="bg-orange-500 h-full rounded-full" 
-                          style={{ width: `${(freq / 100) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-slate-600">{freq}%</span>
-                    </div>
-                  ))}
+          <div className="bg-white p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
+            <TrendingUp className="h-5 w-5 text-emerald-500" />
+            <div>
+              <div className="text-2xl font-black tracking-tighter">{Math.round(stats?.somaMedia)}</div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Soma Média</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
+            <Hash className="h-5 w-5 text-orange-500" />
+            <div>
+              <div className="text-2xl font-black tracking-tighter">
+                {Math.round(stats?.paresMedia)}<span className="text-slate-300 text-lg">P</span>
               </div>
-            </CardContent>
-          </Card>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ideal Pares</p>
+            </div>
+          </div>
 
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Números Mais Atrasados</CardTitle>
+          <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
+            <Sparkles className="h-5 w-5 text-rose-500" />
+            <div>
+              <div className="text-2xl font-black tracking-tighter">9.2</div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Repetidas</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Resultado Principal */}
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[3rem] blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+          <Card className="relative border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white">
+            <CardHeader className="bg-slate-900 text-white p-8">
+              <CardTitle className="flex justify-between items-center">
+                <span className="text-xl font-black italic uppercase tracking-tighter">Último Sorteio</span>
+                <span className="bg-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">
+                  {formatDate(stats?.ultimoConcurso?.data)}
+                </span>
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(stats?.atraso || {})
-                  .sort(([, a]: any, [, b]: any) => b - a)
-                  .slice(0, 5)
-                  .map(([num, atr]: any) => (
-                    <div key={num} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold">
-                        {num.padStart(2, '0')}
-                      </div>
-                      <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="bg-slate-700 h-full rounded-full" 
-                          style={{ width: `${(atr / 20) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-slate-600">{atr} concursos</span>
-                    </div>
-                  ))}
+            <CardContent className="p-10">
+              <div className="grid grid-cols-5 gap-3 md:flex md:flex-wrap md:justify-center">
+                {stats?.ultimoConcurso?.dezenas.map((num: number) => (
+                  <div 
+                    key={num} 
+                    className="aspect-square w-full md:w-14 md:h-14 rounded-2xl bg-slate-50 border-2 border-slate-100 text-slate-900 flex items-center justify-center font-black text-lg md:text-xl shadow-inner"
+                  >
+                    {num.toString().padStart(2, '0')}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="flex justify-center pt-8">
+        <div className="flex justify-center py-10 opacity-30">
           <MadeWithDyad />
         </div>
       </div>
