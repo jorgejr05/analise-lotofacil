@@ -43,9 +43,7 @@ export const Navigation = () => {
                 <p className="text-xs font-black text-slate-900 truncate uppercase italic">
                   {profile?.first_name ? `${profile.first_name}` : 'Especialista'}
                 </p>
-                <p className="text-[9px] text-slate-400 truncate font-bold uppercase tracking-tighter">
-                  {user.email}
-                </p>
+                <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">Online</span>
               </div>
             </div>
           )}
