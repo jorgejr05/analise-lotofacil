@@ -3,6 +3,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInternalApiKey } from "./profile-actions";
 
+const MODEL_NAME = "gemini-2.0-flash-exp";
+
 export const processChatInteraction = async (
   messages: { role: string; content: string }[],
   stats: any,
@@ -17,94 +19,61 @@ export const processChatInteraction = async (
     if (userKey) apiKey = userKey;
   }
 
-  if (!apiKey) return "IA indisponível: Configure sua chave API no Perfil.";
+  if (!apiKey) return "IA Indisponível: Configure sua chave Gemini 2.0 no Perfil.";
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  
-  // Usando o identificador padrão do modelo
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-  const gamesSummary = userGames.length > 0 
-    ? userGames.slice(0, 10).map(g => 
-        `- Jogo: [${g.dezenas.join(', ')}] | Pontos: ${g.pontos || 0}`
-      ).join('\n')
-    : "Nenhum jogo salvo.";
-
-  const labSummary = backtestResults.length > 0
-    ? backtestResults.slice(0, 3).map(b => 
-        `- Motor: ${b.modelo_usado} | Concursos: ${b.quantidade_concursos} | Status: ${b.status} | Eficácia (Média): ${b.resultado_json?.media?.toFixed(2) || 'N/A'}`
-      ).join('\n')
-    : "Nenhum teste de laboratório realizado ainda.";
+  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   const systemPrompt = `
-    Você é o LotoExpert AI, um consultor humano e estrategista de elite da Lotofácil.
+    Você é o LotoExpert AI v2.0, operando no modelo ${MODEL_NAME}.
+    Seu objetivo é ser o consultor definitivo em Lotofácil, baseando-se estritamente em dados.
     
-    REGRAS CRÍTICAS:
-    1. CONHECIMENTO CIENTÍFICO: Você tem acesso aos resultados do LABORATÓRIO (Backtests). Use isso para validar suas sugestões.
-    2. FOCO TOTAL: Você só fala sobre Lotofácil, estatísticas e estratégias.
-    3. COMANDO DE GERAÇÃO: Para disparar a geração na tela, use o código: [GENERATE:X] onde X é o número de jogos.
-    4. HUMANIZAÇÃO: Seja um consultor de alto nível, use os dados para provar por que sua estratégia é boa.
-    
-    Dados de Desempenho Real (Laboratório):
-    ${labSummary}
+    ESTRUTURA DE DADOS DISPONÍVEL:
+    - Laboratório: ${JSON.stringify(backtestResults.slice(0, 3))}
+    - Histórico do Usuário: ${userGames.length} jogos salvos.
+    - Status do Último Concurso: ${stats.ultimoConcurso.concurso}.
 
-    Histórico de Jogos do Usuário:
-    ${gamesSummary}
-
-    Dados Estatísticos Atuais:
-    - Último Concurso: ${stats.ultimoConcurso.concurso}
-    - Soma Média: ${Math.round(stats.somaMedia)}
+    REGRAS DE OURO:
+    1. Não utilize modelos de fallback. Use apenas ${MODEL_NAME}.
+    2. Se o usuário quiser jogos, use [GENERATE:X] no final da resposta.
+    3. Seja preciso, técnico e encorajador.
   `;
 
   try {
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Analisei os resultados do nosso laboratório e os seus jogos anteriores. Estou pronto para criar uma estratégia baseada em evidências. Como posso ajudar?" }] },
+        { role: "model", parts: [{ text: "LotoExpert AI 2.0 ativado. Processando dados de elite para sua estratégia." }] },
       ],
     });
 
     const lastMessage = messages[messages.length - 1].content;
     const result = await chat.sendMessage(lastMessage);
-    const response = await result.response;
-    return response.text();
-  } catch (error: any) {
-    console.error("[Gemini Error]", error);
-    // Se o erro for 404, tentamos o modelo pro como fallback
-    if (error.message?.includes("404") || error.message?.includes("not found")) {
-      try {
-        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await fallbackModel.generateContent(messages[messages.length - 1].content);
-        return result.response.text();
-      } catch (fallbackError) {
-        return "Erro de compatibilidade de modelo. Verifique se sua chave API tem acesso ao Gemini 1.5 Flash.";
-      }
-    }
-    return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API.";
+    return result.response.text();
+  } catch (error) {
+    console.error("[Chat Error]", error);
+    return "Falha na comunicação com o motor de IA. Verifique sua conexão e chave API.";
   }
 };
 
 export const transcribeAudio = async (base64Audio: string, userId?: string) => {
-  let apiKey = process.env.GEMINI_API_KEY;
-
-  if (userId) {
-    const userKey = await getInternalApiKey(userId);
-    if (userKey) apiKey = userKey;
-  }
-
-  if (!apiKey) return "Erro na transcrição: Chave não configurada.";
-  
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  
   try {
+    let apiKey = process.env.GEMINI_API_KEY;
+    if (userId) {
+      const userKey = await getInternalApiKey(userId);
+      if (userKey) apiKey = userKey;
+    }
+    if (!apiKey) return "Chave API não encontrada.";
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    
     const result = await model.generateContent([
-      "Transcreva este áudio para texto em Português do Brasil. Retorne apenas a transcrição.",
+      "Transcreva este áudio para texto. Retorne apenas a transcrição.",
       { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
     return result.response.text();
   } catch (error) {
-    console.error("[Transcription Error]", error);
-    return "Não consegui entender o áudio.";
+    return "Não consegui processar o áudio.";
   }
 };
