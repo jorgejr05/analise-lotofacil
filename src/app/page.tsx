@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy, Loader2 } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy, Loader2, ArrowRightCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -43,10 +43,7 @@ export default function Dashboard() {
   if (loading && !stats) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white dark:bg-slate-950">
-        <div className="relative">
-          <RefreshCw className="h-12 w-12 animate-spin text-indigo-600 opacity-20" />
-          <Sparkles className="h-6 w-6 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-        </div>
+        <Loader2 className="h-12 w-12 animate-spin text-indigo-600 opacity-20" />
         <p className="text-slate-900 dark:text-slate-100 font-black tracking-tighter text-xl italic uppercase">Iniciando Motor...</p>
       </div>
     );
@@ -55,31 +52,19 @@ export default function Dashboard() {
   const quentes = getTopNumbers(stats?.freqTotal, 10);
   const frios = getTopNumbers(stats?.freqTotal, 10, true);
 
-  const getPrize = (hits: number) => {
-    if (!stats?.ultimoConcurso?.premiacao_json || !Array.isArray(stats.ultimoConcurso.premiacao_json)) return "R$ ---";
-    
-    const p = stats.ultimoConcurso.premiacao_json.find((item: any) => {
-      const desc = item.descricao?.toLowerCase() || "";
-      // Lotofácil: Faixa 1 = 15, 2 = 14, 3 = 13, 4 = 12, 5 = 11
-      const faixaMatch = item.faixa === (16 - hits);
-      const descMatch = desc.includes(`${hits} acertos`) || desc.includes(`${hits} pontos`);
-      return faixaMatch || descMatch;
-    });
-    
-    if (!p) return "R$ ---";
+  const formatCurrency = (value: any) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return "R$ ---";
+    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
 
-    // Trata valores que podem vir como string ou número
-    let valor = p.valor;
-    if (typeof valor === 'string') {
-      valor = parseFloat(valor.replace(/[R$\.\s]/g, '').replace(',', '.'));
-    }
+  const getPrizeByHits = (hits: number) => {
+    const premiacao = stats?.ultimoConcurso?.premiacao_json;
+    if (!premiacao || !Array.isArray(premiacao)) return "R$ ---";
     
-    if (!valor || isNaN(valor)) return "R$ ---";
-    
-    return Number(valor).toLocaleString('pt-BR', { 
-      style: 'currency', 
-      currency: 'BRL' 
-    });
+    // Procura por faixa (15 acertos = faixa 1) ou descrição
+    const faixa = premiacao.find((p: any) => p.faixa === (16 - hits) || p.descricao?.includes(`${hits} acertos`));
+    return formatCurrency(faixa?.valor || 0);
   };
 
   return (
@@ -107,7 +92,7 @@ export default function Dashboard() {
             className="w-fit mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
           >
             <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
-            {syncing ? 'Atualizando...' : 'Atualizar Dados'}
+            {syncing ? 'Atualizando...' : 'Atualizar Resultados'}
           </Button>
         </header>
 
@@ -116,15 +101,17 @@ export default function Dashboard() {
             <Hash className="h-5 w-5 text-indigo-500" />
             <div>
               <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-slate-100">#{stats?.ultimoConcurso?.concurso || '---'}</div>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Concurso</p>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Último Concurso</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between h-32">
-            <Banknote className="h-5 w-5 text-emerald-500" />
+          <div className="bg-indigo-600 p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-lg flex flex-col justify-between h-32 text-white">
+            <ArrowRightCircle className="h-5 w-5 text-indigo-200" />
             <div>
-              <div className="text-lg md:text-xl font-black tracking-tighter text-emerald-600 truncate">{getPrize(15)}</div>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Prêmio 15 Pts</p>
+              <div className="text-lg md:text-xl font-black tracking-tighter truncate">
+                {formatCurrency(stats?.ultimoConcurso?.valor_estimado || 0)}
+              </div>
+              <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Próximo Estimado</p>
             </div>
           </div>
 
@@ -134,7 +121,7 @@ export default function Dashboard() {
               <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-slate-100">
                 {Math.round(stats?.paresMedia || 0)}<span className="text-slate-300 dark:text-slate-600 text-lg">P</span>
               </div>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pares Ideais</p>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Média Pares</p>
             </div>
           </div>
 
@@ -144,7 +131,7 @@ export default function Dashboard() {
               <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-slate-100">
                 {stats?.repetidasMedia?.toFixed(1) || "---"}
               </div>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Repetidas</p>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Média Repetidas</p>
             </div>
           </div>
         </div>
@@ -156,9 +143,9 @@ export default function Dashboard() {
               <Card className="relative border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900">
                 <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-8">
                   <CardTitle className="flex justify-between items-center">
-                    <span className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Último Sorteio</span>
+                    <span className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Dezenas Sorteadas</span>
                     <span className="bg-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">
-                      {formatDate(stats?.ultimoConcurso?.data)}
+                      CONCURSO {stats?.ultimoConcurso?.concurso}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -186,7 +173,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Quentes</div>
-                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Mais sorteados (100 jogos)</div>
+                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Top 10 Frequentes</div>
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -214,7 +201,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Frios</div>
-                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Menos sorteados (100 jogos)</div>
+                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Top 10 Atrasados</div>
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -240,7 +227,7 @@ export default function Dashboard() {
             <Card className="border-none shadow-xl rounded-[2.5rem] bg-white dark:bg-slate-900 overflow-hidden">
               <CardHeader className="bg-indigo-600 text-white p-6">
                 <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                  <Trophy className="h-4 w-4" /> Tabela de Prêmios
+                  <Trophy className="h-4 w-4" /> Rateio #{stats?.ultimoConcurso?.concurso}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
@@ -248,7 +235,9 @@ export default function Dashboard() {
                   <div key={pts} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 group hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{pts} Pontos</span>
-                      <span className="text-sm font-black text-slate-900 dark:text-slate-100 italic">{getPrize(pts)}</span>
+                      <span className="text-sm font-black text-slate-900 dark:text-slate-100 italic">
+                        {getPrizeByHits(pts)}
+                      </span>
                     </div>
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black",
@@ -258,9 +247,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
-                <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase text-center mt-4">
-                  Valores baseados no concurso #{stats?.ultimoConcurso?.concurso}
-                </p>
               </CardContent>
             </Card>
           </div>
