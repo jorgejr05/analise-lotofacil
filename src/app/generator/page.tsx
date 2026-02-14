@@ -4,11 +4,11 @@ import { useState, useCallback, useEffect } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { generateAdvancedGames } from "@/lib/generator-service";
 import { generateClosingGames } from "@/lib/closing-service";
-import { generateGameInsight } from "@/lib/gemini";
+import { generateGameInsight, suggestPoolViaIA } from "@/lib/gemini";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu, Target, Layers } from "lucide-react";
+import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu, Target, Layers, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChatInterface } from "@/components/chat-interface";
@@ -18,12 +18,12 @@ export default function GeneratorPage() {
   const [generatedGames, setGeneratedGames] = useState<number[][]>([]);
   const [insight, setInsight] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [quantity, setQuantity] = useState(6);
   const [mode, setMode] = useState<'ia' | 'fechamento'>('ia');
   const [selectedPool, setSelectedPool] = useState<number[]>([]);
 
-  // Sugestão inicial de pool baseada nas estatísticas
   useEffect(() => {
     if (stats && selectedPool.length === 0) {
       const top20 = Object.entries(stats.freqTotal)
@@ -39,6 +39,24 @@ export default function GeneratorPage() {
     setSelectedPool(prev => 
       prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
     );
+  };
+
+  const handleIASuggestion = async () => {
+    if (!stats) return;
+    setIsSuggesting(true);
+    try {
+      const suggestion = await suggestPoolViaIA(stats);
+      if (suggestion) {
+        setSelectedPool(suggestion.sort((a: number, b: number) => a - b));
+        toast.success("IA selecionou as 20 dezenas com maior potencial!");
+      } else {
+        toast.error("IA ocupada. Tente novamente em instantes.");
+      }
+    } catch (error) {
+      toast.error("Erro ao consultar a IA.");
+    } finally {
+      setIsSuggesting(false);
+    }
   };
 
   const handleGenerate = useCallback(async (qtyOverride?: number) => {
@@ -62,7 +80,7 @@ export default function GeneratorPage() {
       }
 
       setGeneratedGames(games);
-      const aiInsight = await generateGameInsight(stats, games);
+      const aiInsight = await generateGameInsight(stats, games, mode);
       setInsight(aiInsight);
       toast.success(`${finalQty} jogos gerados com sucesso!`);
     } catch (error) {
@@ -126,11 +144,22 @@ export default function GeneratorPage() {
           <div className="lg:col-span-7 space-y-6">
             {mode === 'fechamento' && (
               <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden animate-in slide-in-from-top-4 duration-500">
-                <CardHeader className="bg-emerald-50 p-6 border-b border-emerald-100">
-                  <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2">
-                    <Target className="h-4 w-4" /> Seletor de Grupo (Pool)
-                  </CardTitle>
-                  <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Selecione de 18 a 22 dezenas para cercar o prêmio</p>
+                <CardHeader className="bg-emerald-50 p-6 border-b border-emerald-100 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2">
+                      <Target className="h-4 w-4" /> Seletor de Grupo (Pool)
+                    </CardTitle>
+                    <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Selecione de 18 a 22 dezenas para cercar o prêmio</p>
+                  </div>
+                  <Button 
+                    onClick={handleIASuggestion} 
+                    disabled={isSuggesting}
+                    variant="outline" 
+                    className="border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 rounded-xl h-10 text-[9px] font-black uppercase italic"
+                  >
+                    {isSuggesting ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Wand2 className="h-3 w-3 mr-2" />}
+                    Sugestão da IA
+                  </Button>
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="grid grid-cols-5 gap-2">

@@ -2,23 +2,13 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const generateGameInsight = async (stats: any, games: number[][]) => {
+export const generateGameInsight = async (stats: any, games: number[][], mode: 'ia' | 'fechamento' = 'ia') => {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    console.error("[LotoExpert-IA] GEMINI_API_KEY não configurada.");
-    return "Aguardando ativação da IA: Configure a Secret 'GEMINI_API_KEY' no servidor.";
+    return "Aguardando ativação da IA: Configure a Secret 'GEMINI_API_KEY'.";
   }
 
-  /** 
-   * Lista de modelos em ordem de prioridade. 
-   * Agora incluindo a versão 3 Flash conforme solicitado.
-   */
-  const modelsToTry = [
-    "gemini-3-flash-preview",             // Versão solicitada (Preview/Futura)
-    "gemini-2.5-flash",           // Geração atual de alta performance
-  ];
-  
   const quentes = Object.entries(stats.freqTotal || {})
     .sort(([,a]: any, [,b]: any) => b - a)
     .slice(0, 5)
@@ -26,38 +16,52 @@ export const generateGameInsight = async (stats: any, games: number[][]) => {
     .join(", ");
 
   const prompt = `
-    Analise estes 3 jogos da Lotofácil (base 100 concursos):
+    Você é o LotoExpert AI. Analise estes jogos da Lotofácil gerados no modo ${mode.toUpperCase()}:
     - Soma média histórica: ${Math.round(stats.somaMedia)}
     - Dezenas frequentes: ${quentes}
     - Jogos sugeridos: ${JSON.stringify(games)}
     
-    Explique por que esses jogos são equilibrados (fale sobre soma e dezenas repetidas). 
+    ${mode === 'fechamento' 
+      ? "Explique como este fechamento matemático protege o apostador e por que a escolha dessas dezenas é sólida." 
+      : "Explique por que esses jogos baseados em probabilidade são equilibrados."}
+    
     Seja breve (máximo 2 parágrafos). Use Português do Brasil.
   `;
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  for (const modelName of modelsToTry) {
-    try {
-      console.log(`[LotoExpert-IA] Tentando processamento via: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      if (text) {
-        console.log(`[LotoExpert-IA] Sucesso! Respondendo via: ${modelName}`);
-        return text;
-      }
-    } catch (error: any) {
-      console.warn(`[LotoExpert-IA] Modelo ${modelName} ainda não disponível para sua chave:`, error.message);
-      
-      // Se for o último modelo da lista, reportamos o erro final
-      if (modelName === modelsToTry[modelsToTry.length - 1]) {
-        throw error;
-      }
-    }
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    return "Análise estatística concluída. (IA em standby)";
   }
+};
 
-  return "Análise estatística concluída. (IA aguardando processamento)";
+export const suggestPoolViaIA = async (stats: any) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const prompt = `
+    Com base nas estatísticas da Lotofácil:
+    - Dezenas mais frequentes (Top 10): ${JSON.stringify(Object.entries(stats.freqTotal).sort(([,a]:any,[,b]:any)=>b-a).slice(0,10).map(([n])=>n))}
+    - Dezenas com maior atraso: ${JSON.stringify(Object.entries(stats.atraso).sort(([,a]:any,[,b]:any)=>b-a).slice(0,5).map(([n])=>n))}
+    
+    Sugira um grupo de 20 dezenas para um FECHAMENTO de alta performance. 
+    Misture dezenas quentes, dezenas que devem voltar (atrasadas) e dezenas neutras.
+    Retorne APENAS um array JSON de números, exemplo: [1, 2, 3, ...]
+  `;
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const match = text.match(/\[.*\]/);
+    return match ? JSON.parse(match[0]) : null;
+  } catch (error) {
+    return null;
+  }
 };
