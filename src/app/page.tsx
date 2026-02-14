@@ -1,13 +1,21 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
+
+const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
+  if (!freqs) return [];
+  return Object.entries(freqs)
+    .map(([num, freq]) => ({ num: Number(num), freq }))
+    .sort((a, b) => ascending ? a.freq - b.freq : b.freq - a.freq)
+    .slice(0, count);
+};
 
 export default function Dashboard() {
   const { stats, loading, refresh } = useLotofacilStats();
@@ -56,17 +64,9 @@ export default function Dashboard() {
     );
   }
 
-  const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
-    return Object.entries(freqs)
-      .map(([num, freq]) => ({ num: Number(num), freq }))
-      .sort((a, b) => ascending ? a.freq - b.freq : b.freq - a.freq)
-      .slice(0, count);
-  };
+  const quentes = getTopNumbers(stats?.freqTotal, 10);
+  const frios = getTopNumbers(stats?.freqTotal, 10, true);
 
-  const quentes = stats ? getTopNumbers(stats.freqTotal, 10) : [];
-  const frios = stats ? getTopNumbers(stats.freqTotal, 10, true) : [];
-
-  // Extrair prêmios
   const getPrize = (desc: string) => {
     const p = stats?.ultimoConcurso?.premiacao_json?.find((p: any) => p.descricao.includes(desc));
     return p?.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || "R$ ---";
@@ -116,7 +116,7 @@ export default function Dashboard() {
             <Hash className="h-5 w-5 text-orange-500" />
             <div>
               <div className="text-2xl font-black tracking-tighter">
-                {Math.round(stats?.paresMedia)}<span className="text-slate-300 text-lg">P</span>
+                {Math.round(stats?.paresMedia || 0)}<span className="text-slate-300 text-lg">P</span>
               </div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pares Ideais</p>
             </div>
