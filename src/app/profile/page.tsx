@@ -122,11 +122,21 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-4xl mx-auto space-y-8">
-        <header className="space-y-1">
-          <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Configurações</span>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
-            Perfil do <span className="text-indigo-600">Especialista</span>
-          </h1>
+        <header className="flex items-end justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Configurações</span>
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+              Perfil
+            </h1>
+          </div>
+          
+          <Button 
+            onClick={() => signOut()} 
+            variant="ghost" 
+            className="text-[10px] font-black uppercase italic tracking-widest text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl h-10 px-4 transition-colors"
+          >
+            <LogOut className="h-4 w-4 mr-2" /> Sair
+          </Button>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -151,17 +161,6 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Botão Sair visível apenas em Mobile para limpar a barra inferior */}
-            <div className="md:hidden">
-              <Button 
-                onClick={() => signOut()} 
-                variant="outline" 
-                className="w-full h-14 border-2 border-rose-100 text-rose-600 rounded-2xl font-black uppercase italic tracking-widest text-xs hover:bg-rose-50"
-              >
-                <LogOut className="mr-2 h-4 w-4" /> Sair da Conta
-              </Button>
-            </div>
           </div>
 
           <div className="lg:col-span-2 space-y-6">
