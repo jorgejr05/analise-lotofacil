@@ -20,7 +20,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { calculatePoints } from "@/lib/lotofacil-service";
+import { calculatePoints } from "@/lib/lotofacil-utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
