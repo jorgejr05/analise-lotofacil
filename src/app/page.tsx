@@ -32,6 +32,7 @@ export default function Dashboard() {
     try {
       const res = await syncLatestResults();
       toast.success(res.message);
+      await refresh(); // Força a atualização das estatísticas locais após o sync
     } catch (error) {
       toast.error("Erro ao sincronizar dados.");
     } finally {
@@ -54,9 +55,21 @@ export default function Dashboard() {
   const quentes = getTopNumbers(stats?.freqTotal, 10);
   const frios = getTopNumbers(stats?.freqTotal, 10, true);
 
-  const getPrize = (desc: string) => {
-    const p = stats?.ultimoConcurso?.premiacao_json?.find((p: any) => p.descricao.includes(desc));
-    return p?.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || "R$ ---";
+  // Função de busca de prêmio mais robusta (case-insensitive e flexível)
+  const getPrize = (hits: number) => {
+    if (!stats?.ultimoConcurso?.premiacao_json) return "R$ ---";
+    
+    const searchStr = `${hits} acertos`;
+    const p = stats.ultimoConcurso.premiacao_json.find((item: any) => 
+      item.descricao.toLowerCase().includes(searchStr.toLowerCase())
+    );
+    
+    if (!p || !p.valor) return "R$ ---";
+    
+    return p.valor.toLocaleString('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL' 
+    });
   };
 
   return (
@@ -100,7 +113,7 @@ export default function Dashboard() {
           <div className="bg-white dark:bg-slate-900 p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between h-32">
             <Banknote className="h-5 w-5 text-emerald-500" />
             <div>
-              <div className="text-lg md:text-xl font-black tracking-tighter text-emerald-600">{getPrize("15 acertos")}</div>
+              <div className="text-lg md:text-xl font-black tracking-tighter text-emerald-600">{getPrize(15)}</div>
               <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Prêmio 15 Pts</p>
             </div>
           </div>
@@ -225,7 +238,7 @@ export default function Dashboard() {
                   <div key={pts} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 group hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{pts} Pontos</span>
-                      <span className="text-sm font-black text-slate-900 dark:text-slate-100 italic">{getPrize(`${pts} acertos`)}</span>
+                      <span className="text-sm font-black text-slate-900 dark:text-slate-100 italic">{getPrize(pts)}</span>
                     </div>
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black",
