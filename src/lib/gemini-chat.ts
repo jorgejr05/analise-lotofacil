@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInternalApiKey } from "./profile-actions";
 
-const MODEL_NAME = "gemini-3-flash-preview";
+const MODEL_NAME = "gemini-flash-latest";
 
 function handleGeminiError(error: any) {
   console.error("[Gemini Error Detail]", error);
@@ -76,14 +76,12 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     
-    // Prompt mais simples e direto para evitar que a IA ignore áudios curtos
     const result = await model.generateContent([
       "O que foi dito neste áudio? Transcreva apenas o texto.",
       { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
     
     const text = result.response.text().trim();
-    // Se a IA retornar algo que pareça um erro ou for muito curto/vazio
     if (text.length < 2 || text.toLowerCase().includes("transcrição não disponível")) {
       return "";
     }
