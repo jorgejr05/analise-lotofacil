@@ -20,6 +20,7 @@ export const processChatInteraction = async (
   if (!apiKey) return "IA indisponível: Configure sua chave API no Perfil.";
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  // Usando o modelo estável para evitar erros de versão
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const gamesSummary = userGames.length > 0 
@@ -54,17 +55,22 @@ export const processChatInteraction = async (
     - Soma Média: ${Math.round(stats.somaMedia)}
   `;
 
-  const chat = model.startChat({
-    history: [
-      { role: "user", parts: [{ text: systemPrompt }] },
-      { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Analisei os resultados do nosso laboratório e os seus jogos anteriores. Estou pronto para criar uma estratégia baseada em evidências. Como posso ajudar?" }] },
-    ],
-  });
+  try {
+    const chat = model.startChat({
+      history: [
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Analisei os resultados do nosso laboratório e os seus jogos anteriores. Estou pronto para criar uma estratégia baseada em evidências. Como posso ajudar?" }] },
+      ],
+    });
 
-  const lastMessage = messages[messages.length - 1].content;
-  const result = await chat.sendMessage(lastMessage);
-  const response = await result.response;
-  return response.text();
+    const lastMessage = messages[messages.length - 1].content;
+    const result = await chat.sendMessage(lastMessage);
+    const response = await result.response;
+    return response.text();
+  } catch (error: any) {
+    console.error("[Gemini Error]", error);
+    return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API ou tente novamente mais tarde.";
+  }
 };
 
 export const transcribeAudio = async (base64Audio: string, userId?: string) => {
@@ -76,8 +82,10 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
   }
 
   if (!apiKey) return "Erro na transcrição: Chave não configurada.";
+  
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  
   try {
     const result = await model.generateContent([
       "Transcreva este áudio para texto em Português do Brasil. Retorne apenas a transcrição.",
@@ -85,6 +93,7 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
     ]);
     return result.response.text();
   } catch (error) {
+    console.error("[Transcription Error]", error);
     return "Não consegui entender o áudio.";
   }
 };

@@ -9,6 +9,7 @@ import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { processChatInteraction, transcribeAudio } from "@/lib/gemini-chat";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
+import { toast } from "sonner";
 
 interface ChatInterfaceProps {
   stats: any;
@@ -82,20 +83,33 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         setMessages(prev => [...prev, assistantMessage]);
       } catch (error) {
         console.error(error);
+        toast.error("Erro ao processar resposta da IA.");
       } finally {
         setIsTyping(false);
       }
-    }, 2000);
+    }, 1000);
   };
 
   const handleAudio = async () => {
     if (!user) return;
+    
     if (isRecording) {
-      const base64 = await stopRecording();
       setIsTyping(true);
-      const transcription = await transcribeAudio(base64, user.id);
-      setIsTyping(false);
-      sendMessage(transcription, 'audio');
+      try {
+        const base64 = await stopRecording();
+        if (base64) {
+          const transcription = await transcribeAudio(base64, user.id);
+          if (transcription && transcription !== "Não consegui entender o áudio.") {
+            sendMessage(transcription, 'audio');
+          } else {
+            toast.error("Não foi possível transcrever o áudio.");
+          }
+        }
+      } catch (error) {
+        toast.error("Erro ao processar áudio.");
+      } finally {
+        setIsTyping(false);
+      }
     } else {
       startRecording();
     }
@@ -143,11 +157,30 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       </div>
 
       <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-50 dark:border-slate-800 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={handleAudio} className={cn("rounded-full h-12 w-12 shrink-0 transition-all", isRecording ? "bg-rose-500 text-white animate-pulse" : "bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400")}>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleAudio} 
+          className={cn(
+            "rounded-full h-12 w-12 shrink-0 transition-all", 
+            isRecording ? "bg-rose-500 text-white animate-pulse" : "bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+          )}
+        >
           {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </Button>
-        <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} placeholder="Ex: Baseado no laboratório, qual a melhor estratégia?" className="h-12 rounded-2xl border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus-visible:ring-indigo-600 dark:focus-visible:ring-indigo-400 font-medium text-xs text-slate-900 dark:text-slate-100" />
-        <Button onClick={() => sendMessage(input)} disabled={!input.trim()} className="rounded-full h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 shrink-0">
+        <Input 
+          value={input} 
+          onChange={(e) => setInput(e.target.value)} 
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} 
+          placeholder={isRecording ? "Gravando áudio..." : "Ex: Baseado no laboratório, qual a melhor estratégia?"} 
+          disabled={isRecording}
+          className="h-12 rounded-2xl border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus-visible:ring-indigo-600 dark:focus-visible:ring-indigo-400 font-medium text-xs text-slate-900 dark:text-slate-100" 
+        />
+        <Button 
+          onClick={() => sendMessage(input)} 
+          disabled={!input.trim() || isRecording} 
+          className="rounded-full h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 shrink-0"
+        >
           <Send className="h-5 w-5" />
         </Button>
       </div>
