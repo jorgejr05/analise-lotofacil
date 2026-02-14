@@ -8,10 +8,13 @@ import { generateGameInsight, suggestPoolViaIA } from "@/lib/gemini";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu, Target, Layers, Wand2, Info } from "lucide-react";
+import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu, Target, Layers, Wand2, Info, Wallet, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChatInterface } from "@/components/chat-interface";
+import { registerBet } from "@/lib/finance-service";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function GeneratorPage() {
   const { stats, loading } = useLotofacilStats();
@@ -23,6 +26,7 @@ export default function GeneratorPage() {
   const [quantity, setQuantity] = useState(6);
   const [mode, setMode] = useState<'ia' | 'fechamento'>('ia');
   const [selectedPool, setSelectedPool] = useState<number[]>([]);
+  const [isRealBet, setIsRealBet] = useState(false);
 
   useEffect(() => {
     if (stats && selectedPool.length === 0) {
@@ -96,13 +100,22 @@ export default function GeneratorPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const valorTotal = generatedGames.length * 3.5;
+      const concursoId = stats.ultimoConcurso.concurso;
+
+      // 1. Salvar os jogos no histórico de jogos
       const gamesToSave = generatedGames.map(dezenas => ({
         user_id: user.id,
         dezenas,
-        concurso_referencia: stats.ultimoConcurso.concurso
+        concurso_referencia: concursoId
       }));
       await supabase.from('jogos').insert(gamesToSave);
-      toast.success("Jogos salvos no histórico!");
+
+      // 2. Registrar na banca (Real ou Simulado)
+      await registerBet(user.id, concursoId, valorTotal, !isRealBet);
+
+      toast.success(isRealBet ? "Aposta REAL registrada na banca!" : "Aposta SIMULADA registrada!");
       setGeneratedGames([]);
     } catch (error) {
       toast.error("Erro ao salvar");
@@ -182,12 +195,6 @@ export default function GeneratorPage() {
                     <span className="text-[10px] font-black uppercase text-slate-400 italic">Selecionadas: {selectedPool.length}</span>
                     <Button variant="ghost" onClick={() => setSelectedPool([])} className="text-[9px] font-black uppercase text-rose-500">Limpar Tudo</Button>
                   </div>
-                  <div className="mt-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex gap-3 items-start">
-                    <Info className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <p className="text-[9px] font-bold text-emerald-700 uppercase leading-relaxed">
-                      O sistema gerará bilhetes de 15 dezenas (R$ 3,50 cada) usando apenas os números selecionados acima.
-                    </p>
-                  </div>
                 </CardContent>
               </Card>
             )}
@@ -235,17 +242,47 @@ export default function GeneratorPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <Info className="h-4 w-4 text-indigo-600" />
-                        <span className="text-[10px] font-black text-indigo-900 uppercase italic">Custo Estimado na Lotérica:</span>
+                    
+                    <div className="p-6 bg-slate-900 rounded-[2rem] border border-slate-800 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-indigo-400" />
+                          <span className="text-[10px] font-black text-white uppercase italic">Investimento Total:</span>
+                        </div>
+                        <span className="text-sm font-black text-indigo-400">R$ {(generatedGames.length * 3.5).toFixed(2).replace('.', ',')}</span>
                       </div>
-                      <span className="text-sm font-black text-indigo-600">R$ {(generatedGames.length * 3.5).toFixed(2).replace('.', ',')}</span>
+
+                      <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
+                        <div className="flex flex-col">
+                          <Label htmlFor="real-bet" className="text-[10px] font-black text-white uppercase italic">Modo de Registro</Label>
+                          <span className="text-[8px] font-bold text-slate-400 uppercase">{isRealBet ? "Aposta Real (Desconta da Banca)" : "Simulação (Apenas ROI)"}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={cn("text-[8px] font-black uppercase", !isRealBet ? "text-indigo-400" : "text-slate-500")}>Simulado</span>
+                          <Switch 
+                            id="real-bet" 
+                            checked={isRealBet} 
+                            onCheckedChange={setIsRealBet}
+                            className="data-[state=checked]:bg-emerald-500"
+                          />
+                          <span className={cn("text-[8px] font-black uppercase", isRealBet ? "text-emerald-400" : "text-slate-500")}>Real</span>
+                        </div>
+                      </div>
+
+                      <Button 
+                        onClick={handleSaveGames} 
+                        disabled={isSaving} 
+                        className={cn(
+                          "w-full h-14 rounded-xl font-black uppercase italic text-xs tracking-widest transition-all",
+                          isRealBet 
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20" 
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-900/20"
+                        )}
+                      >
+                        {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                        {isRealBet ? "Confirmar Aposta Real" : "Registrar Simulação"}
+                      </Button>
                     </div>
-                    <Button onClick={handleSaveGames} disabled={isSaving} variant="outline" className="w-full mt-2 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50">
-                      {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
-                      Salvar Jogos no Histórico
-                    </Button>
                   </div>
                 )}
               </CardContent>
