@@ -8,7 +8,7 @@ import { generateGameInsight, suggestPoolViaIA } from "@/lib/gemini";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu, Target, Layers, Wand2 } from "lucide-react";
+import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu, Target, Layers, Wand2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChatInterface } from "@/components/chat-interface";
@@ -71,8 +71,8 @@ export default function GeneratorPage() {
       if (mode === 'ia') {
         games = await generateAdvancedGames(finalQty);
       } else {
-        if (selectedPool.length < 15) {
-          toast.error("Selecione pelo menos 15 dezenas para o fechamento.");
+        if (selectedPool.length < 16) {
+          toast.error("Para fechamento, selecione pelo menos 16 dezenas.");
           setIsGenerating(false);
           return;
         }
@@ -149,7 +149,7 @@ export default function GeneratorPage() {
                     <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2">
                       <Target className="h-4 w-4" /> Seletor de Grupo (Pool)
                     </CardTitle>
-                    <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Selecione de 18 a 22 dezenas para cercar o prêmio</p>
+                    <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Escolha as dezenas que o sistema irá desdobrar</p>
                   </div>
                   <Button 
                     onClick={handleIASuggestion} 
@@ -181,6 +181,12 @@ export default function GeneratorPage() {
                   <div className="mt-4 flex justify-between items-center">
                     <span className="text-[10px] font-black uppercase text-slate-400 italic">Selecionadas: {selectedPool.length}</span>
                     <Button variant="ghost" onClick={() => setSelectedPool([])} className="text-[9px] font-black uppercase text-rose-500">Limpar Tudo</Button>
+                  </div>
+                  <div className="mt-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex gap-3 items-start">
+                    <Info className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <p className="text-[9px] font-bold text-emerald-700 uppercase leading-relaxed">
+                      O sistema gerará bilhetes de 15 dezenas (R$ 3,50 cada) usando apenas os números selecionados acima.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -218,7 +224,8 @@ export default function GeneratorPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {generatedGames.map((game, idx) => (
                         <div key={idx} className="p-5 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 relative group">
-                          <div className="grid grid-cols-5 gap-2">
+                          <div className="absolute -top-2 -left-2 bg-white border border-slate-100 px-2 py-1 rounded-lg text-[8px] font-black text-slate-400 uppercase shadow-sm">Jogo {idx + 1} (15 Dezenas)</div>
+                          <div className="grid grid-cols-5 gap-2 mt-2">
                             {game.map(num => (
                               <span key={num} className="aspect-square flex items-center justify-center bg-white border border-indigo-100 text-indigo-700 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
                                 {num.toString().padStart(2, '0')}
@@ -228,7 +235,14 @@ export default function GeneratorPage() {
                         </div>
                       ))}
                     </div>
-                    <Button onClick={handleSaveGames} disabled={isSaving} variant="outline" className="w-full mt-4 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50">
+                    <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Info className="h-4 w-4 text-indigo-600" />
+                        <span className="text-[10px] font-black text-indigo-900 uppercase italic">Custo Estimado na Lotérica:</span>
+                      </div>
+                      <span className="text-sm font-black text-indigo-600">R$ {(generatedGames.length * 3.5).toFixed(2).replace('.', ',')}</span>
+                    </div>
+                    <Button onClick={handleSaveGames} disabled={isSaving} variant="outline" className="w-full mt-2 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50">
                       {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
                       Salvar Jogos no Histórico
                     </Button>
