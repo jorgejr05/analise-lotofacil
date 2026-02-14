@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Dices, History, BarChart3, LogOut } from "lucide-react";
+import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 
@@ -15,6 +15,8 @@ export const Navigation = () => {
   const menuItems = [
     { name: "Painel", href: "/", icon: LayoutDashboard },
     { name: "Gerador", href: "/generator", icon: Dices },
+    { name: "Estatísticas", href: "/statistics", icon: LineChart },
+    { name: "Resultados", href: "/results", icon: List },
     { name: "Meus Jogos", href: "/my-games", icon: History },
   ];
 
@@ -65,9 +67,9 @@ export const Navigation = () => {
         </div>
       </nav>
 
-      {/* Navegação Flutuante Mobile - Apenas Ícones */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-sm z-50">
-        <nav className="bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] rounded-[2.5rem] p-2 flex justify-around items-center">
+      {/* Navegação Flutuante Mobile */}
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50">
+        <nav className="bg-white/80 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] rounded-[2.5rem] p-2 flex justify-around items-center">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -76,23 +78,23 @@ export const Navigation = () => {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-center p-4 transition-all duration-300 relative",
+                  "flex items-center justify-center p-3 transition-all duration-300 relative",
                   isActive ? "text-indigo-600" : "text-slate-400"
                 )}
               >
                 {isActive && (
                   <div className="absolute inset-0 bg-indigo-50/50 rounded-2xl -z-10 animate-in fade-in zoom-in duration-300" />
                 )}
-                <Icon className={cn("h-6 w-6", isActive && "stroke-[2.5px]")} />
+                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
               </Link>
             );
           })}
           
           <button
             onClick={() => signOut()}
-            className="flex items-center justify-center p-4 text-slate-400 active:text-rose-500 transition-colors"
+            className="flex items-center justify-center p-3 text-slate-400 active:text-rose-500 transition-colors"
           >
-            <LogOut className="h-6 w-6" />
+            <LogOut className="h-5 w-5" />
           </button>
         </nav>
       </div>
