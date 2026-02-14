@@ -58,7 +58,8 @@ export const updateAllGamesPoints = async () => {
 
         if (pontos >= 11) {
           const premioInfo = concurso.premiacao_json?.find((p: any) => 
-            p.descricao.toLowerCase().includes(`${pontos} acertos`)
+            (p.descricao?.toLowerCase().includes(`${pontos} acertos`)) || 
+            (p.faixa === (16 - pontos))
           );
           const valorPremiado = premioInfo?.valor || 0;
 
@@ -123,6 +124,19 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     repetidas_anterior = dezenas.filter((n: number) => anterior.dezenas.includes(n)).length;
   }
 
+  // Captura o rateio ou cria um objeto fake com a estimativa se o rateio estiver vazio
+  let premiacoes = data.listaRateio || data.premiacoes || [];
+  
+  // Se não há rateio para 15 pontos mas há estimativa do próximo, usamos a estimativa como referência de prêmio
+  if (premiacoes.length === 0 && data.valor_estimado_proximo) {
+    premiacoes = [{
+      faixa: 1,
+      descricao: "15 acertos",
+      valor: data.valor_estimado_proximo,
+      ganhadores: 0
+    }];
+  }
+
   return {
     concurso: Number(data.concurso),
     data: formatDateForDb(data.data),
@@ -131,7 +145,7 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     pares,
     impares,
     repetidas_anterior,
-    premiacao_json: data.listaRateio || data.premiacoes || [] // Mapeamento corrigido para a API Heroku
+    premiacao_json: premiacoes
   };
 };
 
@@ -148,9 +162,10 @@ export const syncLatestResults = async () => {
       .maybeSingle();
 
     const startFrom = lastSaved ? lastSaved.concurso + 1 : 1;
+    // Sempre re-sincroniza o último para garantir que pegamos o rateio que pode ter demorado a sair
     const syncStart = Math.max(1, startFrom - 1);
 
-    const limit = 5; 
+    const limit = 10; 
     let count = 0;
 
     for (let i = syncStart; i <= latestNum && count < limit; i++) {
@@ -172,7 +187,7 @@ export const syncLatestResults = async () => {
     return { 
       message: count > 0 
         ? `Sincronizados ${count} concursos!` 
-        : 'Dados globais conferidos.' 
+        : 'Dados globais atualizados.' 
     };
   } catch (error) {
     console.error('Erro na sincronização global:', error);

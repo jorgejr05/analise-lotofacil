@@ -56,9 +56,8 @@ export default function Dashboard() {
   const frios = getTopNumbers(stats?.freqTotal, 10, true);
 
   const getPrize = (hits: number) => {
-    if (!stats?.ultimoConcurso?.premiacao_json) return "R$ ---";
+    if (!stats?.ultimoConcurso?.premiacao_json || !Array.isArray(stats.ultimoConcurso.premiacao_json)) return "R$ ---";
     
-    // Procura por faixa de premiação de forma flexível (ex: "15 acertos" ou faixa 1)
     const p = stats.ultimoConcurso.premiacao_json.find((item: any) => {
       const desc = item.descricao?.toLowerCase() || "";
       // Lotofácil: Faixa 1 = 15, 2 = 14, 3 = 13, 4 = 12, 5 = 11
@@ -67,9 +66,17 @@ export default function Dashboard() {
       return faixaMatch || descMatch;
     });
     
-    if (!p || !p.valor) return "R$ ---";
+    if (!p) return "R$ ---";
+
+    // Trata valores que podem vir como string ou número
+    let valor = p.valor;
+    if (typeof valor === 'string') {
+      valor = parseFloat(valor.replace(/[R$\.\s]/g, '').replace(',', '.'));
+    }
     
-    return Number(p.valor).toLocaleString('pt-BR', { 
+    if (!valor || isNaN(valor)) return "R$ ---";
+    
+    return Number(valor).toLocaleString('pt-BR', { 
       style: 'currency', 
       currency: 'BRL' 
     });
