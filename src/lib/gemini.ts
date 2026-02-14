@@ -73,11 +73,11 @@ export const processChatInteraction = async (
     // Se o erro for 404, tentamos o modelo pro como fallback
     if (error.message?.includes("404") || error.message?.includes("not found")) {
       try {
-        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await fallbackModel.generateContent(messages[messages.length - 1].content);
         return result.response.text();
       } catch (fallbackError) {
-        return "Erro de compatibilidade de modelo. Verifique se sua chave API tem acesso ao Gemini 1.5 Flash.";
+        return "Erro de compatibilidade de modelo. Verifique se sua chave API tem acesso ao Gemini 2.5 Flash.";
       }
     }
     return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API.";
