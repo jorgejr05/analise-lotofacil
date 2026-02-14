@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/components/auth-provider";
 
 export default function GeneratorPage() {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const { stats, loading } = useLotofacilStats();
   const [generatedGames, setGeneratedGames] = useState<number[][]>([]);
   const [insight, setInsight] = useState<string>("");
@@ -48,10 +48,10 @@ export default function GeneratorPage() {
   };
 
   const handleIASuggestion = async () => {
-    if (!stats) return;
+    if (!stats || !user) return;
     setIsSuggesting(true);
     try {
-      const suggestion = await suggestPoolViaIA(stats, profile?.gemini_api_key);
+      const suggestion = await suggestPoolViaIA(stats, user.id);
       if (suggestion) {
         setSelectedPool(suggestion.sort((a: number, b: number) => a - b));
         toast.success("IA selecionou as 20 dezenas com maior potencial!");
@@ -66,7 +66,7 @@ export default function GeneratorPage() {
   };
 
   const handleGenerate = useCallback(async (qtyOverride?: number) => {
-    if (!stats) return;
+    if (!stats || !user) return;
     const finalQty = qtyOverride || quantity;
     setIsGenerating(true);
     setInsight("");
@@ -86,7 +86,7 @@ export default function GeneratorPage() {
       }
 
       setGeneratedGames(games);
-      const aiInsight = await generateGameInsight(stats, games, mode, profile?.gemini_api_key);
+      const aiInsight = await generateGameInsight(stats, games, mode, user.id);
       setInsight(aiInsight);
       toast.success(`${finalQty} jogos gerados com sucesso!`);
     } catch (error) {
@@ -94,15 +94,12 @@ export default function GeneratorPage() {
     } finally {
       setIsGenerating(false);
     }
-  }, [stats, quantity, mode, selectedPool, profile]);
+  }, [stats, quantity, mode, selectedPool, user]);
 
   const handleSaveGames = async () => {
-    if (generatedGames.length === 0) return;
+    if (generatedGames.length === 0 || !user) return;
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const valorTotal = generatedGames.length * 3.5;
       const concursoId = stats.ultimoConcurso.concurso;
 

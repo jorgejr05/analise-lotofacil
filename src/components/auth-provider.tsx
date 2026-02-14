@@ -32,9 +32,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
 
   const fetchProfile = async (userId: string) => {
+    // Selecionamos apenas o que é seguro mostrar no navegador
+    // gemini_api_key fica de fora propositalmente
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, first_name, last_name, avatar_url, updated_at')
       .eq('id', userId)
       .single();
     setProfile(data);

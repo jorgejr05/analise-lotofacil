@@ -16,7 +16,7 @@ interface ChatInterfaceProps {
 }
 
 export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) => {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<any[]>([]);
   const [userGames, setUserGames] = useState<any[]>([]);
   const [backtests, setBacktests] = useState<any[]>([]);
@@ -28,28 +28,23 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const [gamesRes, backtestsRes] = await Promise.all([
         supabase.from('jogos').select('*').order('criado_em', { ascending: false }).limit(20),
         supabase.from('backtests').select('*').order('created_at', { ascending: false }).limit(5)
       ]);
-
       if (gamesRes.data) setUserGames(gamesRes.data);
       if (backtestsRes.data) setBacktests(backtestsRes.data);
     };
     fetchData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
   const sendMessage = async (content: string, type: 'text' | 'audio' = 'text') => {
-    if (!content.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!content.trim() || !user) return;
 
     const newMessage = { user_id: user.id, role: 'user', content, type, created_at: new Date().toISOString() };
     setMessages(prev => [...prev, newMessage]);
@@ -65,7 +60,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
           stats, 
           userGames, 
           backtests,
-          profile?.gemini_api_key
+          user.id
         );
         
         const genMatch = response.match(/\[GENERATE:(\d+)\]/);
@@ -94,10 +89,11 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   };
 
   const handleAudio = async () => {
+    if (!user) return;
     if (isRecording) {
       const base64 = await stopRecording();
       setIsTyping(true);
-      const transcription = await transcribeAudio(base64, profile?.gemini_api_key);
+      const transcription = await transcribeAudio(base64, user.id);
       setIsTyping(false);
       sendMessage(transcription, 'audio');
     } else {

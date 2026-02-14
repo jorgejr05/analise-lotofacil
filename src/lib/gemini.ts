@@ -1,9 +1,15 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getInternalApiKey } from "./profile-actions";
 
-export const generateGameInsight = async (stats: any, games: number[][], mode: 'ia' | 'fechamento' = 'ia', userApiKey?: string) => {
-  const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+export const generateGameInsight = async (stats: any, games: number[][], mode: 'ia' | 'fechamento' = 'ia', userId?: string) => {
+  let apiKey = process.env.GEMINI_API_KEY;
+
+  if (userId) {
+    const userKey = await getInternalApiKey(userId);
+    if (userKey) apiKey = userKey;
+  }
   
   if (!apiKey) {
     return "Aguardando ativação da IA: Configure sua chave API no Perfil.";
@@ -39,8 +45,14 @@ export const generateGameInsight = async (stats: any, games: number[][], mode: '
   }
 };
 
-export const suggestPoolViaIA = async (stats: any, userApiKey?: string) => {
-  const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+export const suggestPoolViaIA = async (stats: any, userId?: string) => {
+  let apiKey = process.env.GEMINI_API_KEY;
+
+  if (userId) {
+    const userKey = await getInternalApiKey(userId);
+    if (userKey) apiKey = userKey;
+  }
+
   if (!apiKey) return null;
 
   const prompt = `

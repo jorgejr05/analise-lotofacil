@@ -1,15 +1,22 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getInternalApiKey } from "./profile-actions";
 
 export const processChatInteraction = async (
   messages: { role: string; content: string }[],
   stats: any,
   userGames: any[] = [],
   backtestResults: any[] = [],
-  userApiKey?: string
+  userId?: string
 ) => {
-  const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+  let apiKey = process.env.GEMINI_API_KEY;
+
+  if (userId) {
+    const userKey = await getInternalApiKey(userId);
+    if (userKey) apiKey = userKey;
+  }
+
   if (!apiKey) return "IA indisponível: Configure sua chave API no Perfil.";
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -60,8 +67,14 @@ export const processChatInteraction = async (
   return response.text();
 };
 
-export const transcribeAudio = async (base64Audio: string, userApiKey?: string) => {
-  const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+export const transcribeAudio = async (base64Audio: string, userId?: string) => {
+  let apiKey = process.env.GEMINI_API_KEY;
+
+  if (userId) {
+    const userKey = await getInternalApiKey(userId);
+    if (userKey) apiKey = userKey;
+  }
+
   if (!apiKey) return "Erro na transcrição: Chave não configurada.";
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
