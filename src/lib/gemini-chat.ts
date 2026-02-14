@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInternalApiKey } from "./profile-actions";
 
-const MODEL_NAME = "gemini-2.0-flash-exp";
+const MODEL_NAME = "gemini-3-flash-preview";
 
 export const processChatInteraction = async (
   messages: { role: string; content: string }[],
@@ -19,13 +19,13 @@ export const processChatInteraction = async (
     if (userKey) apiKey = userKey;
   }
 
-  if (!apiKey) return "IA Indisponível: Configure sua chave Gemini 2.0 no Perfil.";
+  if (!apiKey) return "IA Indisponível: Configure sua chave Gemini no Perfil.";
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   const systemPrompt = `
-    Você é o LotoExpert AI v2.0, operando no modelo ${MODEL_NAME}.
+    Você é o LotoExpert AI v3.0, operando no modelo ${MODEL_NAME}.
     Seu objetivo é ser o consultor definitivo em Lotofácil, baseando-se estritamente em dados.
     
     ESTRUTURA DE DADOS DISPONÍVEL:
@@ -43,7 +43,7 @@ export const processChatInteraction = async (
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "LotoExpert AI 2.0 ativado. Processando dados de elite para sua estratégia." }] },
+        { role: "model", parts: [{ text: "LotoExpert AI 3.0 (Flash Preview) ativado. Processando dados de elite." }] },
       ],
     });
 
@@ -52,7 +52,7 @@ export const processChatInteraction = async (
     return result.response.text();
   } catch (error) {
     console.error("[Chat Error]", error);
-    return "Falha na comunicação com o motor de IA. Verifique sua conexão e chave API.";
+    return "Falha na comunicação com o motor de IA. Verifique sua chave API.";
   }
 };
 

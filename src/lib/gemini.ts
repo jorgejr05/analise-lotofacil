@@ -4,9 +4,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInternalApiKey } from "./profile-actions";
 
 /**
- * Nome do modelo definitivo configurado para o agente.
+ * Nome do modelo definitivo conforme solicitado pelo usuário.
  */
-const MODEL_NAME = "gemini-2.0-flash-exp";
+const MODEL_NAME = "gemini-3-flash-preview";
 
 async function getModel(userId?: string) {
   let apiKey = process.env.GEMINI_API_KEY;
