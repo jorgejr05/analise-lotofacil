@@ -7,16 +7,13 @@ import { Input } from "@/components/ui/input";
 import { 
   Send, 
   Mic, 
-  Square, 
   Loader2, 
   Bot, 
   CheckCheck, 
   Trash2, 
   Maximize2, 
-  Minimize2, 
-  Play, 
-  X,
-  Clock
+  Minimize2,
+  X
 } from "lucide-react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { processChatInteraction, transcribeAudio } from "@/lib/gemini-chat";
@@ -39,7 +36,6 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<ChatStatus>(null);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [pendingAudio, setPendingAudio] = useState<string | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
@@ -69,7 +65,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     }
   }, [messages, status, isExpanded]);
 
-  // Timer de Gravação
+  // Cronômetro de gravação
   useEffect(() => {
     if (isRecording) {
       setRecordingTime(0);
@@ -108,7 +104,6 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     await supabase.from('chat_messages').insert(userMessage);
     setMessages(prev => [...prev, userMessage]);
     setInput("");
-    setPendingAudio(null);
     setStatus("lendo");
     
     try {
@@ -131,28 +126,28 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     }
   };
 
-  const handleStartRecording = () => {
-    if (!user || status) return;
-    setPendingAudio(null);
+  const onStartRecording = () => {
+    if (status) return;
     startRecording();
   };
 
-  const handleStopRecording = async () => {
-    const base64 = await stopRecording();
-    if (base64) {
-      setPendingAudio(base64);
-    }
+  const onCancelRecording = async () => {
+    await stopRecording(); // Para e descarta o retorno
+    setRecordingTime(0);
   };
 
-  const handleSendPendingAudio = async () => {
-    if (!pendingAudio || !user) return;
+  const onFinishAndSend = async () => {
     setStatus("transcrevendo");
-    const trans = await transcribeAudio(pendingAudio, user.id);
-    if (trans.trim()) {
-      sendMessage(trans, 'audio');
+    const base64 = await stopRecording();
+    if (base64) {
+      const trans = await transcribeAudio(base64, user?.id);
+      if (trans.trim()) {
+        sendMessage(trans, 'audio');
+      } else {
+        toast.info("Áudio vazio ou não compreendido.");
+        setStatus(null);
+      }
     } else {
-      toast.info("Não consegui entender o áudio. Tente falar mais claro.");
-      setPendingAudio(null);
       setStatus(null);
     }
   };
@@ -222,28 +217,25 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         <div className="flex-1 h-12 flex items-center bg-white dark:bg-slate-800 rounded-full px-4 shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           
           {isRecording ? (
-            <div className="flex-1 flex items-center justify-between px-2 animate-in slide-in-from-right-4 duration-300">
+            <div className="flex-1 flex items-center justify-between px-1 animate-in slide-in-from-right-4 duration-300">
+              <button 
+                onClick={onCancelRecording} 
+                className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors"
+                title="Cancelar gravação"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+              
               <div className="flex items-center gap-3">
                 <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
                 <span className="text-sm font-black italic text-slate-600 dark:text-slate-300">{formatTime(recordingTime)}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase text-slate-400 animate-pulse">Gravando áudio...</span>
-                <button onClick={handleStopRecording} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors">
-                  <Square className="h-5 w-5 fill-current" />
-                </button>
-              </div>
-            </div>
-          ) : pendingAudio ? (
-            <div className="flex-1 flex items-center justify-between px-2 animate-in zoom-in duration-300">
-              <button onClick={() => setPendingAudio(null)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
-                <Trash2 className="h-5 w-5" />
-              </button>
-              <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 rounded-full">
-                <Play className="h-4 w-4 text-indigo-500 fill-current" />
-                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-300">Áudio Gravado</span>
-              </div>
-              <button onClick={handleSendPendingAudio} disabled={!!status} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-full transition-colors">
+
+              <button 
+                onClick={onFinishAndSend} 
+                className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-full transition-colors"
+                title="Enviar áudio agora"
+              >
                 <Send className="h-5 w-5 fill-current" />
               </button>
             </div>
@@ -258,7 +250,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
                 className="border-none bg-transparent focus-visible:ring-0 h-10 text-sm" 
               />
               <button 
-                onClick={handleStartRecording} 
+                onClick={onStartRecording} 
                 disabled={!!status}
                 className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
               >
@@ -268,7 +260,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
           )}
         </div>
 
-        {!isRecording && !pendingAudio && (
+        {!isRecording && (
           <Button 
             onClick={() => sendMessage(input)} 
             disabled={!input.trim() || !!status} 
