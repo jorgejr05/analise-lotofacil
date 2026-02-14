@@ -5,6 +5,24 @@ import { getInternalApiKey } from "./profile-actions";
 
 const MODEL_NAME = "gemini-3-flash-preview";
 
+/**
+ * Função utilitária para capturar mensagens de erro amigáveis da API Gemini
+ */
+function handleGeminiError(error: any) {
+  console.error("[Gemini Error Detail]", error);
+  const status = error?.status;
+  
+  if (status === 429) {
+    return "Ops! Você atingiu o limite de requisições da sua conta gratuita do Gemini. Tente novamente em alguns instantes ou use uma chave com maior quota.";
+  }
+  
+  if (status === 400) {
+    return "Erro nos dados enviados para a IA. Tente reformular sua frase.";
+  }
+
+  return "Tive um erro ao processar sua solicitação. Verifique sua chave API no perfil!";
+}
+
 export const processChatInteraction = async (
   messages: { role: string; content: string }[],
   stats: any,
@@ -21,37 +39,36 @@ export const processChatInteraction = async (
 
   if (!apiKey) return "IA Indisponível: Configure sua chave Gemini no Perfil.";
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-
-  const systemPrompt = `
-    Você é o LotoExpert, um consultor de elite ultra-conciso e amigável.
-    
-    DIRETRIZES DE COMUNICAÇÃO:
-    1. RESUMO: Suas respostas devem ser curtas e diretas (máximo 2 parágrafos pequenos).
-    2. APROVAÇÃO: NUNCA gere jogos ou execute comandos sem que o usuário peça explicitamente ou confirme sua sugestão. Pergunte: "Quer que eu gere X jogos com essa lógica?".
-    3. SEM FORMATAÇÃO: Use texto puro. Nada de asteriscos, hashtags ou listas com hífens.
-    4. GATILHO: Só use [GENERATE:X] após o usuário confirmar ou pedir diretamente.
-
-    CONTEXTO:
-    - Último Concurso: ${stats.ultimoConcurso.concurso}.
-    - Performance IA: ${backtestResults[0]?.resultado_json?.media || '9.0'} acertos médios.
-  `;
-
   try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+    const systemPrompt = `
+      Você é o LotoExpert, um consultor de elite ultra-conciso e amigável.
+      
+      DIRETRIZES DE COMUNICAÇÃO:
+      1. RESUMO: Suas respostas devem ser curtas e diretas (máximo 2 parágrafos pequenos).
+      2. APROVAÇÃO: NUNCA gere jogos sem pedido explícito. Pergunte: "Quer que eu gere X jogos?".
+      3. SEM FORMATAÇÃO: Use texto puro. Nada de asteriscos ou hashtags.
+      4. GATILHO: Só use [GENERATE:X] após confirmação.
+
+      CONTEXTO:
+      - Último Concurso: ${stats?.ultimoConcurso?.concurso || 'Desconhecido'}.
+      - Seus Jogos: ${userGames.length} registrados.
+    `;
+
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Opa! LotoExpert na área. Serei breve e direto, e só executo se você mandar. Como posso ajudar?" }] },
+        { role: "model", parts: [{ text: "Pronto! Como o LotoExpert pode te ajudar agora?" }] },
       ],
     });
 
     const lastMessage = messages[messages.length - 1].content;
     const result = await chat.sendMessage(lastMessage);
     return result.response.text();
-  } catch (error) {
-    console.error("[processChatInteraction] Erro no Gemini:", error);
-    return "Tive um erro aqui. Dá uma olhada na sua chave API lá no perfil!";
+  } catch (error: any) {
+    return handleGeminiError(error);
   }
 };
 
@@ -67,16 +84,16 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     
-    console.log("[transcribeAudio] Enviando áudio para transcrição...");
     const result = await model.generateContent([
-      "Transcreva exatamente o que foi dito neste áudio sobre a Lotofácil. Se não houver fala clara, responda: ERRO_TRANSCRICAO",
+      "Transcreva o áudio sobre a Lotofácil. Se não houver fala clara, responda: ERRO_TRANSCRICAO",
       { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
     
     const text = result.response.text();
     return text.includes("ERRO_TRANSCRICAO") ? "" : text;
-  } catch (error) {
-    console.error("[transcribeAudio] Erro na transcrição:", error);
+  } catch (error: any) {
+    // Para transcrição, retornamos uma string especial para o componente saber que foi erro de quota
+    if (error?.status === 429) return "LIMITE_EXCEDIDO";
     return "";
   }
 };

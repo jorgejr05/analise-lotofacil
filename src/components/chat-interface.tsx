@@ -120,7 +120,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       await supabase.from('chat_messages').insert(assistantMessage);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      toast.error("Erro na IA.");
+      toast.error("Erro na comunicação com a IA.");
     } finally {
       setStatus(null);
     }
@@ -132,7 +132,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   };
 
   const onCancelRecording = async () => {
-    await stopRecording(); // Para e descarta o retorno
+    await stopRecording();
     setRecordingTime(0);
   };
 
@@ -141,6 +141,13 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     const base64 = await stopRecording();
     if (base64) {
       const trans = await transcribeAudio(base64, user?.id);
+      
+      if (trans === "LIMITE_EXCEDIDO") {
+        toast.error("Limite de requisições da IA excedido (Quota 429). Tente novamente mais tarde.");
+        setStatus(null);
+        return;
+      }
+
       if (trans.trim()) {
         sendMessage(trans, 'audio');
       } else {
