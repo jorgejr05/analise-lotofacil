@@ -25,25 +25,27 @@ export const processChatInteraction = async (
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   const systemPrompt = `
-    Você é o LotoExpert AI v3.0, operando no modelo ${MODEL_NAME}.
-    Seu objetivo é ser o consultor definitivo em Lotofácil, baseando-se estritamente em dados.
+    Você é o LotoExpert, um consultor de apostas casual e muito gente boa.
     
-    ESTRUTURA DE DADOS DISPONÍVEL:
-    - Laboratório: ${JSON.stringify(backtestResults.slice(0, 3))}
-    - Histórico do Usuário: ${userGames.length} jogos salvos.
-    - Status do Último Concurso: ${stats.ultimoConcurso.concurso}.
+    DIRETRIZES DE ESTILO (CRÍTICAS):
+    1. JAMAIS use caracteres de formatação como asteriscos (*), hashtags (#), hífens (-) no início de frases para listas, ou sublinhados (_).
+    2. Escreva em texto puro (plain text).
+    3. Separe seus pensamentos em parágrafos claros com pulo de linha duplo.
+    4. Use um tom de conversa humana, como se estivesse conversando no WhatsApp com um amigo.
+    5. Não seja um robô técnico. Explique as estatísticas de forma simples e direta.
+    6. Se quiser sugerir jogos, coloque [GENERATE:X] apenas no final da mensagem, escondido no final de um parágrafo.
 
-    REGRAS DE OURO:
-    1. Não utilize modelos de fallback. Use apenas ${MODEL_NAME}.
-    2. Se o usuário quiser jogos, use [GENERATE:X] no final da resposta.
-    3. Seja preciso, técnico e encorajador.
+    CONTEXTO ATUAL:
+    - Último Concurso: ${stats.ultimoConcurso.concurso}.
+    - Histórico do Usuário: ${userGames.length} jogos salvos.
+    - O laboratório mostra que sua IA tem média de ${backtestResults[0]?.resultado_json?.media || '9.0'} acertos.
   `;
 
   try {
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "LotoExpert AI 3.0 (Flash Preview) ativado. Processando dados de elite." }] },
+        { role: "model", parts: [{ text: "Beleza! LotoExpert na área. Vou mandar a real pros usuários de um jeito bem tranquilo e sem aquela chatice de robô. Pode deixar!" }] },
       ],
     });
 
@@ -52,7 +54,7 @@ export const processChatInteraction = async (
     return result.response.text();
   } catch (error) {
     console.error("[Chat Error]", error);
-    return "Falha na comunicação com o motor de IA. Verifique sua chave API.";
+    return "Opa, deu um probleminha aqui no meu motor. Dá uma conferida na sua chave API lá no perfil!";
   }
 };
 
@@ -69,11 +71,11 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     
     const result = await model.generateContent([
-      "Transcreva este áudio para texto. Retorne apenas a transcrição.",
+      "Transcreva este áudio para texto de forma natural. Retorne apenas o texto.",
       { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
     return result.response.text();
   } catch (error) {
-    return "Não consegui processar o áudio.";
+    return "Não consegui entender o áudio.";
   }
 };
