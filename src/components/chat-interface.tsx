@@ -11,11 +11,30 @@ import { cn } from "@/lib/utils";
 
 export const ChatInterface = ({ stats }: { stats: any }) => {
   const [messages, setMessages] = useState<any[]>([]);
+  const [userGames, setUserGames] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
   const scrollRef = useRef<HTMLDivElement>(null);
   const batchTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Buscar jogos do usuário para dar contexto à IA
+  useEffect(() => {
+    const fetchUserGames = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('jogos')
+        .select('*')
+        .order('criado_em', { ascending: false })
+        .limit(20);
+      
+      if (data) setUserGames(data);
+    };
+
+    fetchUserGames();
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -40,13 +59,13 @@ export const ChatInterface = ({ stats }: { stats: any }) => {
     setMessages(prev => [...prev, newMessage]);
     setInput("");
 
-    // Lógica de processamento em lote (5 segundos)
     if (batchTimer.current) clearTimeout(batchTimer.current);
     
     batchTimer.current = setTimeout(async () => {
       setIsTyping(true);
       try {
-        const response = await processChatInteraction([...messages, newMessage], stats);
+        // Enviamos os jogos do usuário como contexto adicional
+        const response = await processChatInteraction([...messages, newMessage], stats, userGames);
         const assistantMessage = {
           user_id: user.id,
           role: 'assistant',
@@ -94,7 +113,7 @@ export const ChatInterface = ({ stats }: { stats: any }) => {
         {messages.length === 0 && (
           <div className="text-center py-10 space-y-2">
             <p className="text-slate-400 text-[10px] font-black uppercase italic">Inicie uma consultoria estratégica</p>
-            <p className="text-slate-300 text-[9px] font-medium px-10">Pergunte sobre tendências, dezenas quentes ou peça uma análise do próximo concurso.</p>
+            <p className="text-slate-300 text-[9px] font-medium px-10">Pergunte sobre seus jogos salvos ou peça uma análise de desempenho.</p>
           </div>
         )}
         {messages.map((msg, i) => (
@@ -118,7 +137,7 @@ export const ChatInterface = ({ stats }: { stats: any }) => {
         {isTyping && (
           <div className="flex items-center gap-2 text-indigo-600 animate-pulse">
             <Loader2 className="h-3 w-3 animate-spin" />
-            <span className="text-[9px] font-black uppercase italic">Analisando dados...</span>
+            <span className="text-[9px] font-black uppercase italic">Analisando seu histórico...</span>
           </div>
         )}
       </div>
@@ -140,7 +159,7 @@ export const ChatInterface = ({ stats }: { stats: any }) => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
-          placeholder="Pergunte sobre o próximo jogo..."
+          placeholder="Como está o desempenho dos meus jogos?"
           className="h-12 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-medium text-xs"
         />
 
