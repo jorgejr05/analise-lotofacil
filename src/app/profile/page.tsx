@@ -147,7 +147,6 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter">{formData.first_name} {formData.last_name}</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{user?.email}</p>
                 </div>
               </CardContent>
             </Card>
