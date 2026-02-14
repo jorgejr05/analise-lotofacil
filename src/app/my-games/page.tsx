@@ -2,34 +2,67 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { History, Trophy, Calendar, Sparkles } from "lucide-react";
+import { 
+  History, 
+  Trophy, 
+  Calendar, 
+  Sparkles, 
+  Search,
+  CheckCircle2
+} from "lucide-react";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { calculatePoints } from "@/lib/lotofacil-service";
 
 export default function MyGamesPage() {
   const [jogos, setJogos] = useState<any[]>([]);
+  const [concursos, setConcursos] = useState<any[]>([]);
+  const [selectedConcurso, setSelectedConcurso] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchJogos = async () => {
+    const fetchData = async () => {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
+      // 1. Buscar jogos do usuário
+      const { data: gamesData } = await supabase
         .from('jogos')
-        .select('*, concursos(data, dezenas)')
+        .select('*')
         .order('criado_em', { ascending: false });
 
-      if (!error) setJogos(data || []);
+      // 2. Buscar últimos 20 concursos para comparação
+      const { data: contestsData } = await supabase
+        .from('concursos')
+        .select('concurso, dezenas, data')
+        .order('concurso', { ascending: false })
+        .limit(20);
+
+      if (gamesData) setJogos(gamesData);
+      if (contestsData) {
+        setConcursos(contestsData);
+        setSelectedConcurso(contestsData[0]?.concurso.toString());
+      }
+      
       setLoading(false);
     };
 
-    fetchJogos();
+    fetchData();
   }, []);
+
+  const currentContestData = concursos.find(c => c.concurso.toString() === selectedConcurso);
 
   if (loading) {
     return (
@@ -43,11 +76,29 @@ export default function MyGamesPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-5xl mx-auto space-y-8">
-        <header className="space-y-1">
-          <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Registro de Atividade</span>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
-            Meus <span className="text-indigo-600">Jogos</span>
-          </h1>
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Registro de Atividade</span>
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+              Meus <span className="text-indigo-600">Jogos</span>
+            </h1>
+          </div>
+
+          <div className="w-full md:w-72 space-y-2">
+            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Conferir com Resultado:</label>
+            <Select value={selectedConcurso} onValueChange={setSelectedConcurso}>
+              <SelectTrigger className="h-12 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 shadow-sm">
+                <SelectValue placeholder="Selecione o concurso" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-slate-100 shadow-2xl">
+                {concursos.map((c) => (
+                  <SelectItem key={c.concurso} value={c.concurso.toString()} className="font-bold py-3">
+                    Concurso {c.concurso} ({new Date(c.data).toLocaleDateString('pt-BR')})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </header>
 
         {jogos.length === 0 ? (
@@ -61,57 +112,76 @@ export default function MyGamesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
-            {jogos.map((jogo, idx) => (
-              <Card 
-                key={jogo.id} 
-                className={cn(
-                  "border-none shadow-xl overflow-hidden bg-white group transition-all duration-500 hover:scale-[1.01]",
-                  idx % 2 === 0 ? "rounded-tl-[3rem] rounded-br-[3rem]" : "rounded-tr-[3rem] rounded-bl-[3rem]"
-                )}
-              >
-                <div className="flex flex-col md:flex-row">
-                  {/* Status Sidebar */}
-                  <div className={cn(
-                    "w-full md:w-24 p-6 flex md:flex-col items-center justify-center gap-4 text-white",
-                    jogo.pontos >= 11 ? "bg-emerald-500" : "bg-slate-900"
-                  )}>
-                    <div className="text-center">
-                      <div className="text-3xl font-black leading-none">{jogo.pontos || 0}</div>
-                      <div className="text-[10px] font-black uppercase tracking-tighter opacity-80">Pontos</div>
-                    </div>
-                    {jogo.pontos >= 11 && <Trophy className="h-6 w-6 animate-bounce" />}
-                  </div>
+            {jogos.map((jogo, idx) => {
+              const pontos = currentContestData 
+                ? calculatePoints(jogo.dezenas, currentContestData.dezenas)
+                : 0;
+              
+              const isWinner = pontos >= 11;
 
-                  {/* Content */}
-                  <CardContent className="flex-1 p-8 space-y-6">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 font-black italic rounded-lg">
-                          CONCURSO {jogo.concurso_referencia}
-                        </Badge>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                          <Calendar className="h-3 w-3 mr-1" /> {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
-                        </span>
+              return (
+                <Card 
+                  key={jogo.id} 
+                  className={cn(
+                    "border-none shadow-xl overflow-hidden bg-white group transition-all duration-500 hover:scale-[1.01]",
+                    idx % 2 === 0 ? "rounded-tl-[3rem] rounded-br-[3rem]" : "rounded-tr-[3rem] rounded-bl-[3rem]"
+                  )}
+                >
+                  <div className="flex flex-col md:flex-row">
+                    {/* Status Sidebar */}
+                    <div className={cn(
+                      "w-full md:w-28 p-6 flex md:flex-col items-center justify-center gap-4 text-white transition-colors duration-500",
+                      isWinner ? "bg-emerald-500" : "bg-slate-900"
+                    )}>
+                      <div className="text-center">
+                        <div className="text-4xl font-black leading-none">{pontos}</div>
+                        <div className="text-[10px] font-black uppercase tracking-tighter opacity-80">Acertos</div>
                       </div>
-                      <div className="text-[10px] font-black uppercase text-slate-300 italic">
-                        Ref: {jogo.id.slice(0, 8)}
-                      </div>
+                      {isWinner && <Trophy className="h-6 w-6 animate-bounce" />}
                     </div>
 
-                    <div className="grid grid-cols-5 gap-2 max-w-sm">
-                      {jogo.dezenas.map((num: number) => (
-                        <div 
-                          key={num} 
-                          className="aspect-square flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-700 rounded-xl text-xs font-black shadow-inner group-hover:bg-indigo-50 group-hover:border-indigo-100 group-hover:text-indigo-600 transition-colors"
-                        >
-                          {num.toString().padStart(2, '0')}
+                    {/* Content */}
+                    <CardContent className="flex-1 p-8 space-y-6">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 font-black italic rounded-lg">
+                            CRIADO EM {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
+                          </Badge>
+                          {currentContestData && (
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                              <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" /> 
+                              Comparando com #{currentContestData.concurso}
+                            </span>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
-            ))}
+                        <div className="text-[10px] font-black uppercase text-slate-300 italic">
+                          ID: {jogo.id.slice(0, 8)}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-5 md:grid-cols-8 lg:grid-cols-15 gap-2">
+                        {jogo.dezenas.map((num: number) => {
+                          const isHit = currentContestData?.dezenas.includes(num);
+                          return (
+                            <div 
+                              key={num} 
+                              className={cn(
+                                "aspect-square flex items-center justify-center rounded-xl text-xs font-black shadow-inner transition-all duration-300",
+                                isHit 
+                                  ? "bg-emerald-500 text-white border-emerald-400 scale-110 shadow-emerald-100" 
+                                  : "bg-slate-50 border border-slate-100 text-slate-400"
+                              )}
+                            >
+                              {num.toString().padStart(2, '0')}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
