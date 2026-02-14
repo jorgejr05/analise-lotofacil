@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import {
   Loader2, 
   ShieldCheck,
   UserCircle,
-  KeyRound
+  KeyRound,
+  Upload
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState<any>({
     first_name: "",
     last_name: "",
@@ -30,6 +32,7 @@ export default function ProfilePage() {
   });
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -51,6 +54,48 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
+  const handleUploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+
+      const file = event.target.files[0];
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar-${Math.random()}.${fileExt}`;
+
+      // Upload para o Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Obter URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Atualizar estado e banco de dados
+      setProfile({ ...profile, avatar_url: publicUrl });
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      toast.success("Foto de perfil atualizada!");
+    } catch (error: any) {
+      toast.error("Erro no upload: " + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdating(true);
@@ -63,7 +108,6 @@ export default function ProfilePage() {
         .update({
           first_name: profile.first_name,
           last_name: profile.last_name,
-          avatar_url: profile.avatar_url,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -88,7 +132,7 @@ export default function ProfilePage() {
       const { error } = await supabase.auth.updateUser(updates);
       if (error) throw error;
 
-      toast.success("Dados de segurança atualizados! Verifique seu e-mail se alterou o endereço.");
+      toast.success("Dados de segurança atualizados!");
       setNewPassword("");
     } catch (error) {
       toast.error("Erro ao atualizar segurança.");
@@ -117,20 +161,33 @@ export default function ProfilePage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Sidebar de Avatar */}
           <div className="space-y-6">
             <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
               <CardContent className="p-8 flex flex-col items-center text-center space-y-4">
                 <div className="relative group">
-                  <Avatar className="h-32 w-32 border-4 border-slate-50 shadow-2xl">
-                    <AvatarImage src={profile.avatar_url} />
+                  <Avatar className="h-32 w-32 border-4 border-slate-50 shadow-2xl overflow-hidden">
+                    <AvatarImage src={profile.avatar_url} className="object-cover" />
                     <AvatarFallback className="bg-indigo-600 text-white text-3xl font-black">
                       {profile.first_name?.[0]}{profile.last_name?.[0]}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                    <Camera className="text-white h-8 w-8" />
-                  </div>
+                  
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white gap-1"
+                  >
+                    {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
+                    <span className="text-[8px] font-black uppercase">Alterar</span>
+                  </button>
+
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleUploadAvatar} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter">
@@ -148,7 +205,6 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          {/* Formulários */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
               <CardHeader className="bg-slate-900 text-white p-6">
@@ -177,15 +233,6 @@ export default function ProfilePage() {
                         className="h-12 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-bold"
                       />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">URL da Foto de Perfil</Label>
-                    <Input 
-                      value={profile.avatar_url} 
-                      onChange={(e) => setProfile({...profile, avatar_url: e.target.value})}
-                      placeholder="https://exemplo.com/foto.jpg"
-                      className="h-12 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-bold"
-                    />
                   </div>
                   <Button 
                     type="submit" 
