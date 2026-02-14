@@ -7,7 +7,7 @@ import { generateGameInsight } from "@/lib/gemini";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare } from "lucide-react";
+import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare, Cpu } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChatInterface } from "@/components/chat-interface";
@@ -27,14 +27,17 @@ export default function GeneratorPage() {
     setInsight("");
     
     try {
+      // Simulação visual de processamento pesado
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       const games = generateProbabilisticGames(stats, finalQty);
       setGeneratedGames(games);
       
       const aiInsight = await generateGameInsight(stats, games);
       setInsight(aiInsight);
-      toast.success(`${finalQty} ${finalQty === 1 ? 'jogo gerado' : 'jogos gerados'} com sucesso!`);
+      toast.success(`${finalQty} ${finalQty === 1 ? 'jogo de elite gerado' : 'jogos de elite gerados'}!`);
     } catch (error) {
-      toast.error("Falha ao gerar jogos");
+      toast.error("Falha ao simular jogos");
     } finally {
       setIsGenerating(false);
     }
@@ -70,7 +73,7 @@ export default function GeneratorPage() {
     }
   };
 
-  const increment = () => setQuantity(prev => prev + 1); // Removido limite de 10
+  const increment = () => setQuantity(prev => prev + 1);
   const decrement = () => setQuantity(prev => Math.max(prev - 1, 1));
 
   if (loading) return null;
@@ -78,11 +81,17 @@ export default function GeneratorPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
-        <header className="space-y-1">
-          <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Algoritmo Ativo</span>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
-            Motor <span className="text-indigo-600">Inteligente</span>
-          </h1>
+        <header className="flex justify-between items-start">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Processamento Monte Carlo</span>
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+              Motor <span className="text-indigo-600">Inteligente</span>
+            </h1>
+          </div>
+          <div className="hidden md:flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm">
+            <Cpu className="h-4 w-4 text-emerald-500 animate-pulse" />
+            <span className="text-[9px] font-black uppercase text-slate-400">Status: Alta Performance</span>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -107,8 +116,17 @@ export default function GeneratorPage() {
                   </div>
 
                   <Button onClick={() => handleGenerate()} disabled={isGenerating} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 h-12 shadow-lg shadow-indigo-100 font-black uppercase italic text-[10px] tracking-widest">
-                    {isGenerating ? <Loader2 className="animate-spin h-4 w-4" /> : <Rocket className="mr-2 h-4 w-4" />}
-                    Gerar {quantity > 1 ? `${quantity} Jogos` : 'Jogo'}
+                    {isGenerating ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin h-4 w-4" />
+                        Simulando 10k Cenários...
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <Rocket className="mr-2 h-4 w-4" />
+                        Gerar {quantity > 1 ? `${quantity} Jogos` : 'Jogo'}
+                      </div>
+                    )}
                   </Button>
                 </div>
               </CardHeader>
@@ -116,16 +134,18 @@ export default function GeneratorPage() {
                 {generatedGames.length === 0 ? (
                   <div className="py-20 text-center flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
-                      <Sparkles className="h-8 w-8 text-slate-200" />
+                      <Cpu className="h-8 w-8 text-slate-200" />
                     </div>
-                    <p className="text-slate-400 font-bold text-sm uppercase italic">Aguardando comando...</p>
+                    <p className="text-slate-400 font-bold text-[10px] uppercase italic tracking-widest">Aguardando comando de simulação...</p>
                   </div>
                 ) : (
                   <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {generatedGames.map((game, idx) => (
                         <div key={idx} className="p-5 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 p-2 opacity-5 text-[8px] font-black uppercase">Probabilidade: 84%</div>
+                          <div className="absolute top-0 right-0 p-3 opacity-10 text-[8px] font-black uppercase flex items-center gap-1">
+                            <Sparkles className="h-2 w-2" /> Elite Match
+                          </div>
                           <div className="grid grid-cols-5 gap-2">
                             {game.map(num => (
                               <span key={num} className="aspect-square flex items-center justify-center bg-white border border-indigo-100 text-indigo-700 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
@@ -136,9 +156,9 @@ export default function GeneratorPage() {
                         </div>
                       ))}
                     </div>
-                    <Button onClick={handleSaveGames} disabled={isSaving} variant="outline" className="w-full mt-4 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50">
+                    <Button onClick={handleSaveGames} disabled={isSaving} variant="outline" className="w-full mt-4 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50 transition-all">
                       {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
-                      Fixar {generatedGames.length} {generatedGames.length === 1 ? 'Jogo' : 'Jogos'} no Histórico
+                      Fixar Seleção no Histórico
                     </Button>
                   </div>
                 )}
@@ -150,7 +170,7 @@ export default function GeneratorPage() {
                 <Card className="border-none shadow-2xl rounded-[2rem] bg-indigo-950 text-white overflow-hidden">
                   <CardHeader className="bg-indigo-900/50 p-6">
                     <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 text-indigo-300">
-                      <BrainCircuit className="h-4 w-4" /> Análise por IA
+                      <BrainCircuit className="h-4 w-4" /> Relatório de Simulação
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-8">
