@@ -4,7 +4,20 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Mic, Square, Loader2, Bot, CheckCheck, Trash2, Maximize2, Minimize2 } from "lucide-react";
+import { 
+  Send, 
+  Mic, 
+  Square, 
+  Loader2, 
+  Bot, 
+  CheckCheck, 
+  Trash2, 
+  Maximize2, 
+  Minimize2, 
+  Play, 
+  X,
+  Clock
+} from "lucide-react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { processChatInteraction, transcribeAudio } from "@/lib/gemini-chat";
 import { cn } from "@/lib/utils";
@@ -26,8 +39,12 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<ChatStatus>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [pendingAudio, setPendingAudio] = useState<string | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const userName = profile?.first_name || "Você";
 
@@ -52,6 +69,25 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     }
   }, [messages, status, isExpanded]);
 
+  // Timer de Gravação
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isRecording]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const cleanMarkdown = (text: string) => text.replace(/[*#_~`]/g, '').trim();
 
   const handleClearChat = async () => {
@@ -72,6 +108,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     await supabase.from('chat_messages').insert(userMessage);
     setMessages(prev => [...prev, userMessage]);
     setInput("");
+    setPendingAudio(null);
     setStatus("lendo");
     
     try {
@@ -94,25 +131,29 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     }
   };
 
-  const handleAudio = async () => {
+  const handleStartRecording = () => {
     if (!user || status) return;
-    
-    if (isRecording) {
-      setStatus("transcrevendo");
-      const base64 = await stopRecording();
-      if (base64) {
-        const trans = await transcribeAudio(base64, user.id);
-        if (trans.trim()) {
-          sendMessage(trans, 'audio');
-        } else {
-          toast.info("Não consegui entender o áudio. Tente falar mais claro.");
-          setStatus(null);
-        }
-      } else {
-        setStatus(null);
-      }
+    setPendingAudio(null);
+    startRecording();
+  };
+
+  const handleStopRecording = async () => {
+    const base64 = await stopRecording();
+    if (base64) {
+      setPendingAudio(base64);
+    }
+  };
+
+  const handleSendPendingAudio = async () => {
+    if (!pendingAudio || !user) return;
+    setStatus("transcrevendo");
+    const trans = await transcribeAudio(pendingAudio, user.id);
+    if (trans.trim()) {
+      sendMessage(trans, 'audio');
     } else {
-      startRecording();
+      toast.info("Não consegui entender o áudio. Tente falar mais claro.");
+      setPendingAudio(null);
+      setStatus(null);
     }
   };
 
@@ -150,7 +191,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         </div>
       </div>
 
-      {/* Chat */}
+      {/* Chat Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 z-10 scrollbar-hide">
         {messages.map((msg, i) => (
           <div key={i} className={cn("flex flex-col max-w-[90%]", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
@@ -176,28 +217,66 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         )}
       </div>
 
-      {/* Input */}
+      {/* Input / Recording Bar */}
       <div className="p-3 bg-[#F0F0F0] dark:bg-slate-900 flex items-center gap-2 z-10 border-t dark:border-slate-800">
-        <div className="flex-1 flex items-center bg-white dark:bg-slate-900 rounded-full px-4 py-1 shadow-sm border border-slate-200 dark:border-slate-700">
-          <Input 
-            value={input} 
-            onChange={(e) => setInput(e.target.value)} 
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} 
-            placeholder="Diga algo..." 
-            disabled={isRecording || !!status}
-            className="border-none bg-transparent focus-visible:ring-0 h-10 text-sm" 
-          />
-          <button 
-            onClick={handleAudio} 
-            disabled={!!status && status !== "transcrevendo"}
-            className={cn("p-2 transition-colors", isRecording ? "text-rose-500 animate-pulse" : "text-slate-400 hover:text-indigo-600")}
-          >
-            {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </button>
+        <div className="flex-1 h-12 flex items-center bg-white dark:bg-slate-800 rounded-full px-4 shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+          
+          {isRecording ? (
+            <div className="flex-1 flex items-center justify-between px-2 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse" />
+                <span className="text-sm font-black italic text-slate-600 dark:text-slate-300">{formatTime(recordingTime)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 animate-pulse">Gravando áudio...</span>
+                <button onClick={handleStopRecording} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors">
+                  <Square className="h-5 w-5 fill-current" />
+                </button>
+              </div>
+            </div>
+          ) : pendingAudio ? (
+            <div className="flex-1 flex items-center justify-between px-2 animate-in zoom-in duration-300">
+              <button onClick={() => setPendingAudio(null)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
+                <Trash2 className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 rounded-full">
+                <Play className="h-4 w-4 text-indigo-500 fill-current" />
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-300">Áudio Gravado</span>
+              </div>
+              <button onClick={handleSendPendingAudio} disabled={!!status} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-full transition-colors">
+                <Send className="h-5 w-5 fill-current" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <Input 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} 
+                placeholder="Diga algo..." 
+                disabled={!!status}
+                className="border-none bg-transparent focus-visible:ring-0 h-10 text-sm" 
+              />
+              <button 
+                onClick={handleStartRecording} 
+                disabled={!!status}
+                className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            </>
+          )}
         </div>
-        <Button onClick={() => sendMessage(input)} disabled={!input.trim() || !!status} className="rounded-full h-12 w-12 bg-[#128C7E] p-0 hover:bg-[#075E54] transition-colors">
-          <Send className="h-5 w-5 text-white" />
-        </Button>
+
+        {!isRecording && !pendingAudio && (
+          <Button 
+            onClick={() => sendMessage(input)} 
+            disabled={!input.trim() || !!status} 
+            className="rounded-full h-12 w-12 bg-[#128C7E] p-0 hover:bg-[#075E54] transition-colors"
+          >
+            <Send className="h-5 w-5 text-white" />
+          </Button>
+        )}
       </div>
     </div>
   );
