@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { generateProbabilisticGames } from "@/lib/generator-service";
 import { generateGameInsight } from "@/lib/gemini";
@@ -20,24 +20,25 @@ export default function GeneratorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async (qtyOverride?: number) => {
     if (!stats) return;
+    const finalQty = qtyOverride || quantity;
     setIsGenerating(true);
     setInsight("");
     
     try {
-      const games = generateProbabilisticGames(stats, quantity);
+      const games = generateProbabilisticGames(stats, finalQty);
       setGeneratedGames(games);
       
       const aiInsight = await generateGameInsight(stats, games);
       setInsight(aiInsight);
-      toast.success(`${quantity} ${quantity === 1 ? 'jogo gerado' : 'jogos gerados'} com sucesso!`);
+      toast.success(`${finalQty} ${finalQty === 1 ? 'jogo gerado' : 'jogos gerados'} com sucesso!`);
     } catch (error) {
       toast.error("Falha ao gerar jogos");
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [stats, quantity]);
 
   const handleSaveGames = async () => {
     if (generatedGames.length === 0) return;
@@ -85,7 +86,6 @@ export default function GeneratorPage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Coluna do Gerador */}
           <div className="lg:col-span-7 space-y-6">
             <Card className="border-none shadow-2xl rounded-[2rem] bg-white overflow-hidden">
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-50 p-6 gap-4">
@@ -95,28 +95,18 @@ export default function GeneratorPage() {
                 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center bg-slate-50 rounded-2xl p-1 border border-slate-100">
-                    <button 
-                      onClick={decrement}
-                      className="p-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-400 hover:text-indigo-600"
-                    >
+                    <button onClick={decrement} className="p-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-400 hover:text-indigo-600">
                       <Minus className="h-4 w-4" />
                     </button>
                     <div className="w-12 text-center">
                       <span className="text-lg font-black text-slate-900 italic">{quantity}</span>
                     </div>
-                    <button 
-                      onClick={increment}
-                      className="p-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-400 hover:text-indigo-600"
-                    >
+                    <button onClick={increment} className="p-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-400 hover:text-indigo-600">
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
 
-                  <Button 
-                    onClick={handleGenerate} 
-                    disabled={isGenerating}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 h-12 shadow-lg shadow-indigo-100 font-black uppercase italic text-[10px] tracking-widest"
-                  >
+                  <Button onClick={() => handleGenerate()} disabled={isGenerating} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 h-12 shadow-lg shadow-indigo-100 font-black uppercase italic text-[10px] tracking-widest">
                     {isGenerating ? <Loader2 className="animate-spin h-4 w-4" /> : <Rocket className="mr-2 h-4 w-4" />}
                     Gerar {quantity > 1 ? `${quantity} Jogos` : 'Jogo'}
                   </Button>
@@ -146,13 +136,7 @@ export default function GeneratorPage() {
                         </div>
                       ))}
                     </div>
-                    
-                    <Button 
-                      onClick={handleSaveGames} 
-                      disabled={isSaving}
-                      variant="outline" 
-                      className="w-full mt-4 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50"
-                    >
+                    <Button onClick={handleSaveGames} disabled={isSaving} variant="outline" className="w-full mt-4 h-14 border-2 border-indigo-100 rounded-tl-2xl rounded-br-2xl text-indigo-600 font-black uppercase italic text-xs tracking-widest hover:bg-indigo-50">
                       {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
                       Fixar {generatedGames.length} {generatedGames.length === 1 ? 'Jogo' : 'Jogos'} no Histórico
                     </Button>
@@ -170,22 +154,19 @@ export default function GeneratorPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-8">
-                    <p className="text-indigo-100 text-sm leading-relaxed font-medium italic">
-                      {insight}
-                    </p>
+                    <p className="text-indigo-100 text-sm leading-relaxed font-medium italic">{insight}</p>
                   </CardContent>
                 </Card>
               </div>
             )}
           </div>
 
-          {/* Coluna do Chat */}
           <div className="lg:col-span-5 space-y-4">
             <div className="flex items-center gap-2 px-2">
               <MessageSquare className="h-4 w-4 text-indigo-600" />
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">Consultoria em Tempo Real</span>
             </div>
-            <ChatInterface stats={stats} />
+            <ChatInterface stats={stats} onGenerateRequest={handleGenerate} />
           </div>
         </div>
       </div>

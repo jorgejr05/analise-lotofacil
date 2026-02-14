@@ -13,38 +13,33 @@ export const processChatInteraction = async (
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  const now = new Date();
-  
-  // Formata um resumo dos jogos do usuário para o contexto
   const gamesSummary = userGames.length > 0 
     ? userGames.slice(0, 10).map(g => 
-        `- Jogo (ID: ${g.id.slice(0,4)}): [${g.dezenas.join(', ')}] | Pontos: ${g.pontos || 0} | Ref: #${g.concurso_referencia}`
+        `- Jogo: [${g.dezenas.join(', ')}] | Pontos: ${g.pontos || 0}`
       ).join('\n')
-    : "Nenhum jogo salvo no histórico ainda.";
+    : "Nenhum jogo salvo.";
 
-  const contextPrompt = `
-    Você é o LotoExpert AI, um estrategista de elite da Lotofácil.
-    Data/Hora Atual: ${now.toLocaleString('pt-BR')}
+  const systemPrompt = `
+    Você é o LotoExpert AI, um consultor humano e estrategista de elite da Lotofácil.
     
-    Contexto Global:
-    - Último Concurso: ${stats.ultimoConcurso.concurso}
-    - Dezenas Sorteadas: ${stats.ultimoConcurso.dezenas.join(', ')}
-    - Soma Média: ${Math.round(stats.somaMedia)}
+    REGRAS CRÍTICAS:
+    1. FOCO TOTAL: Você só fala sobre Lotofácil, estatísticas, estratégias de jogo e desempenho do usuário.
+    2. DESVIO DE ASSUNTO: Se o usuário perguntar algo fora desse tema, responda: "Como seu Agente Estrategista, meu foco é total na sua performance na Lotofácil. Vamos voltar às estratégias de jogo?"
+    3. HUMANIZAÇÃO: Seja claro, direto e motivador. Não use termos excessivamente robóticos.
+    4. COMANDO DE GERAÇÃO: Se o usuário pedir para gerar jogos (ex: "gere 3 jogos", "faça 5 apostas"), você DEVE incluir no final da sua resposta o código: [GENERATE:X] onde X é o número de jogos (máximo 10).
+    5. SEM ALUCINAÇÕES: Baseie-se nos dados reais fornecidos:
+       - Último Concurso: ${stats.ultimoConcurso.concurso}
+       - Dezenas: ${stats.ultimoConcurso.dezenas.join(', ')}
+       - Soma Média: ${Math.round(stats.somaMedia)}
     
-    Histórico de Jogos do Usuário (Últimos 10):
+    Histórico do Usuário:
     ${gamesSummary}
-    
-    Instruções:
-    1. Se o usuário perguntar sobre o desempenho dele, analise os pontos dos jogos salvos.
-    2. Compare as dezenas dos jogos salvos com as tendências atuais (quentes/frias).
-    3. Sugira ajustes com base no que funcionou ou não nos jogos anteriores dele.
-    4. Mantenha o tom de consultor técnico e motivador.
   `;
 
   const chat = model.startChat({
     history: [
-      { role: "user", parts: [{ text: contextPrompt }] },
-      { role: "model", parts: [{ text: "Entendido. Tenho acesso total aos dados globais e ao histórico de desempenho do usuário. Estou pronto para fornecer uma análise personalizada." }] },
+      { role: "user", parts: [{ text: systemPrompt }] },
+      { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Estou focado exclusivamente em otimizar suas estratégias de Lotofácil com base em dados reais e no seu histórico. Como posso ajudar com seus jogos hoje?" }] },
     ],
   });
 
@@ -57,23 +52,15 @@ export const processChatInteraction = async (
 export const transcribeAudio = async (base64Audio: string) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return "Erro na transcrição.";
-
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
   try {
     const result = await model.generateContent([
       "Transcreva este áudio para texto em Português do Brasil. Retorne apenas a transcrição.",
-      {
-        inlineData: {
-          mimeType: "audio/webm",
-          data: base64Audio
-        }
-      }
+      { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
     return result.response.text();
   } catch (error) {
-    console.error("Erro Gemini Audio:", error);
     return "Não consegui entender o áudio.";
   }
 };
