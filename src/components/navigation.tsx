@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ThemeToggle } from "./theme-toggle";
 
 export const Navigation = () => {
   const pathname = usePathname();
@@ -33,7 +32,6 @@ export const Navigation = () => {
             <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
               <BarChart3 className="h-7 w-7" /> LOTOEXPERT
             </h2>
-            <ThemeToggle />
           </div>
           
           {user && (
@@ -111,8 +109,6 @@ export const Navigation = () => {
               </Link>
             );
           })}
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
-          <ThemeToggle />
         </nav>
       </div>
     </>
