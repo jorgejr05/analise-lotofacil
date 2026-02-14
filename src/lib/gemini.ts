@@ -3,6 +3,64 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInternalApiKey } from "./profile-actions";
 
+/**
+ * Gets the Gemini model instance using the user's or system's API key.
+ */
+async function getModel(userId?: string) {
+  let apiKey = process.env.GEMINI_API_KEY;
+  if (userId) {
+    const userKey = await getInternalApiKey(userId);
+    if (userKey) apiKey = userKey;
+  }
+  if (!apiKey) throw new Error("API Key not configured");
+  
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
+
+export const generateGameInsight = async (stats: any, games: number[][], mode: string, userId?: string) => {
+  try {
+    const model = await getModel(userId);
+    const prompt = `
+      Analise estes jogos de Lotofácil gerados pelo modo ${mode}:
+      Jogos: ${JSON.stringify(games)}
+      
+      Estatísticas Atuais:
+      Soma Média: ${stats.somaMedia}
+      Pares Médios: ${stats.paresMedia}
+      Último Concurso: ${JSON.stringify(stats.ultimoConcurso.dezenas)}
+      
+      Forneça um insight curto (máximo 3 frases) sobre a qualidade destes jogos e a probabilidade de convergência baseada em tendências.
+    `;
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("[Gemini Insight Error]", error);
+    return "Análise temporariamente indisponível.";
+  }
+};
+
+export const suggestPoolViaIA = async (stats: any, userId?: string) => {
+  try {
+    const model = await getModel(userId);
+    const prompt = `
+      Baseado nas estatísticas da Lotofácil:
+      Frequência Total: ${JSON.stringify(stats.freqTotal)}
+      Atrasos: ${JSON.stringify(stats.atraso)}
+      
+      Selecione as 20 melhores dezenas para um fechamento estratégico. 
+      Retorne APENAS um array JSON de números, ex: [1, 2, 3...]
+    `;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const match = text.match(/\[.*\]/);
+    return match ? JSON.parse(match[0]) : null;
+  } catch (error) {
+    console.error("[Gemini Pool Error]", error);
+    return null;
+  }
+};
+
 export const processChatInteraction = async (
   messages: { role: string; content: string }[],
   stats: any,
@@ -10,101 +68,42 @@ export const processChatInteraction = async (
   backtestResults: any[] = [],
   userId?: string
 ) => {
-  let apiKey = process.env.GEMINI_API_KEY;
-
-  if (userId) {
-    const userKey = await getInternalApiKey(userId);
-    if (userKey) apiKey = userKey;
-  }
-
-  if (!apiKey) return "IA indisponível: Configure sua chave API no Perfil.";
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  
-  // Usando o identificador padrão do modelo
-  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-  const gamesSummary = userGames.length > 0 
-    ? userGames.slice(0, 10).map(g => 
-        `- Jogo: [${g.dezenas.join(', ')}] | Pontos: ${g.pontos || 0}`
-      ).join('\n')
-    : "Nenhum jogo salvo.";
-
-  const labSummary = backtestResults.length > 0
-    ? backtestResults.slice(0, 3).map(b => 
-        `- Motor: ${b.modelo_usado} | Concursos: ${b.quantidade_concursos} | Status: ${b.status} | Eficácia (Média): ${b.resultado_json?.media?.toFixed(2) || 'N/A'}`
-      ).join('\n')
-    : "Nenhum teste de laboratório realizado ainda.";
-
-  const systemPrompt = `
-    Você é o LotoExpert AI, um consultor humano e estrategista de elite da Lotofácil.
-    
-    REGRAS CRÍTICAS:
-    1. CONHECIMENTO CIENTÍFICO: Você tem acesso aos resultados do LABORATÓRIO (Backtests). Use isso para validar suas sugestões.
-    2. FOCO TOTAL: Você só fala sobre Lotofácil, estatísticas e estratégias.
-    3. COMANDO DE GERAÇÃO: Para disparar a geração na tela, use o código: [GENERATE:X] onde X é o número de jogos.
-    4. HUMANIZAÇÃO: Seja um consultor de alto nível, use os dados para provar por que sua estratégia é boa.
-    
-    Dados de Desempenho Real (Laboratório):
-    ${labSummary}
-
-    Histórico de Jogos do Usuário:
-    ${gamesSummary}
-
-    Dados Estatísticos Atuais:
-    - Último Concurso: ${stats.ultimoConcurso.concurso}
-    - Soma Média: ${Math.round(stats.somaMedia)}
-  `;
-
   try {
+    const model = await getModel(userId);
+    
+    const gamesSummary = userGames.length > 0 
+      ? userGames.slice(0, 10).map(g => `- Jogo: [${g.dezenas.join(', ')}] | Pontos: ${g.pontos || 0}`).join('\n')
+      : "Nenhum jogo salvo.";
+
+    const labSummary = backtestResults.length > 0
+      ? backtestResults.slice(0, 3).map(b => `- Motor: ${b.modelo_usado} | Média: ${b.resultado_json?.media?.toFixed(2) || 'N/A'}`).join('\n')
+      : "Nenhum teste de laboratório realizado.";
+
+    const systemPrompt = `Você é o LotoExpert AI. Analise: Laboratório: ${labSummary}. Jogos do Usuário: ${gamesSummary}. Último Concurso: ${stats.ultimoConcurso.concurso}. Se o usuário pedir para gerar jogos, responda com [GENERATE:X] no final.`;
+
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Analisei os resultados do nosso laboratório e os seus jogos anteriores. Estou pronto para criar uma estratégia baseada em evidências. Como posso ajudar?" }] },
+        { role: "model", parts: [{ text: "Pronto para traçar sua estratégia vencedora." }] },
       ],
     });
 
-    const lastMessage = messages[messages.length - 1].content;
-    const result = await chat.sendMessage(lastMessage);
-    const response = await result.response;
-    return response.text();
+    const result = await chat.sendMessage(messages[messages.length - 1].content);
+    return result.response.text();
   } catch (error: any) {
-    console.error("[Gemini Error]", error);
-    // Se o erro for 404, tentamos o modelo pro como fallback
-    if (error.message?.includes("404") || error.message?.includes("not found")) {
-      try {
-        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const result = await fallbackModel.generateContent(messages[messages.length - 1].content);
-        return result.response.text();
-      } catch (fallbackError) {
-        return "Erro de compatibilidade de modelo. Verifique se sua chave API tem acesso ao Gemini 2.5 Flash.";
-      }
-    }
-    return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API.";
+    return "Erro na comunicação com a IA. Verifique sua chave API.";
   }
 };
 
 export const transcribeAudio = async (base64Audio: string, userId?: string) => {
-  let apiKey = process.env.GEMINI_API_KEY;
-
-  if (userId) {
-    const userKey = await getInternalApiKey(userId);
-    if (userKey) apiKey = userKey;
-  }
-
-  if (!apiKey) return "Erro na transcrição: Chave não configurada.";
-  
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-  
   try {
+    const model = await getModel(userId);
     const result = await model.generateContent([
       "Transcreva este áudio para texto em Português do Brasil. Retorne apenas a transcrição.",
       { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
     return result.response.text();
   } catch (error) {
-    console.error("[Transcription Error]", error);
     return "Não consegui entender o áudio.";
   }
 };
