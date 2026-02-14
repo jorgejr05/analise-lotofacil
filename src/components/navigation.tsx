@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ThemeToggle } from "./theme-toggle";
 
 export const Navigation = () => {
   const pathname = usePathname();
@@ -26,22 +27,25 @@ export const Navigation = () => {
 
   return (
     <>
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r z-50">
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-900 border-r dark:border-slate-800 z-50 transition-colors">
         <div className="p-6 pb-4 flex flex-col gap-4">
-          <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
-            <BarChart3 className="h-7 w-7" /> LOTOEXPERT
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
+              <BarChart3 className="h-7 w-7" /> LOTOEXPERT
+            </h2>
+            <ThemeToggle />
+          </div>
           
           {user && (
-            <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-              <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+            <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <Avatar className="h-10 w-10 border-2 border-white dark:border-slate-700 shadow-sm">
                 <AvatarImage src={profile?.avatar_url} className="object-cover object-center" />
                 <AvatarFallback className="bg-indigo-600 text-white text-xs font-black">
                   {profile?.first_name?.[0] || user.email?.[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col min-w-0">
-                <p className="text-xs font-black text-slate-900 truncate uppercase italic">
+                <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate uppercase italic">
                   {profile?.first_name ? `${profile.first_name}` : 'Especialista'}
                 </p>
                 <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">Online</span>
@@ -62,8 +66,8 @@ export const Navigation = () => {
                     className={cn(
                       "flex items-center gap-3 px-5 py-4 transition-all duration-300",
                       isActive 
-                        ? "bg-indigo-600 text-white rounded-tr-3xl rounded-bl-3xl shadow-lg shadow-indigo-100 font-bold translate-x-1" 
-                        : "text-slate-500 hover:bg-slate-50 rounded-xl"
+                        ? "bg-indigo-600 text-white rounded-tr-3xl rounded-bl-3xl shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 font-bold translate-x-1" 
+                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl"
                     )}
                   >
                     <Icon className="h-5 w-5" />
@@ -75,10 +79,10 @@ export const Navigation = () => {
           </ul>
         </ScrollArea>
 
-        <div className="p-6 pt-4 border-t border-slate-100 mt-auto">
+        <div className="p-6 pt-4 border-t border-slate-100 dark:border-slate-800 mt-auto">
           <button
             onClick={() => signOut()}
-            className="flex items-center gap-3 px-5 py-4 w-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-300 group"
+            className="flex items-center gap-3 px-5 py-4 w-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all duration-300 group"
           >
             <LogOut className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
             <span className="text-sm font-bold uppercase tracking-wider">Sair</span>
@@ -86,8 +90,8 @@ export const Navigation = () => {
         </div>
       </nav>
 
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50">
-        <nav className="bg-white/80 backdrop-blur-xl border border-white/40 shadow-lg rounded-[2.5rem] p-2 flex justify-around items-center">
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-md z-50">
+        <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-slate-800/40 shadow-lg rounded-[2.5rem] p-2 flex justify-around items-center">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -97,16 +101,18 @@ export const Navigation = () => {
                 href={item.href}
                 className={cn(
                   "flex items-center justify-center p-3 transition-all duration-300 relative",
-                  isActive ? "text-indigo-600" : "text-slate-400"
+                  isActive ? "text-indigo-600" : "text-slate-400 dark:text-slate-500"
                 )}
               >
                 {isActive && (
-                  <div className="absolute inset-0 bg-indigo-50/50 rounded-2xl -z-10 animate-in fade-in zoom-in duration-300" />
+                  <div className="absolute inset-0 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl -z-10 animate-in fade-in zoom-in duration-300" />
                 )}
                 <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
               </Link>
             );
           })}
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+          <ThemeToggle />
         </nav>
       </div>
     </>
