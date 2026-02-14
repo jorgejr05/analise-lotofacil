@@ -133,9 +133,10 @@ export default function ProfilePage() {
           <Button 
             onClick={() => signOut()} 
             variant="ghost" 
-            className="text-[10px] font-black uppercase italic tracking-widest text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl h-10 px-4 transition-colors"
+            size="icon"
+            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl h-10 w-10 transition-colors"
           >
-            <LogOut className="h-4 w-4 mr-2" /> Sair
+            <LogOut className="h-5 w-5" />
           </Button>
         </header>
 
