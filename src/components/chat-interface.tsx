@@ -53,7 +53,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       try {
         const response = await processChatInteraction([...messages, newMessage], stats, userGames);
         
-        // Detectar comando de geração: [GENERATE:X] - Sem limite de 10
+        // Detectar comando de geração: [GENERATE:X]
         const genMatch = response.match(/\[GENERATE:(\d+)\]/);
         let cleanResponse = response.replace(/\[GENERATE:\d+\]/g, "").trim();
 
