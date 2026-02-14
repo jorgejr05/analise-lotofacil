@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, TrendingUp, Hash, Clock, Sparkles, Flame, Snowflake } from "lucide-react";
 import { toast } from "sonner";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -210,10 +209,6 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="flex justify-center py-10 opacity-30">
-          <MadeWithDyad />
         </div>
       </div>
     </div>

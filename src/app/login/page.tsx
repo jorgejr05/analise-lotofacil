@@ -5,7 +5,6 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, ShieldCheck } from "lucide-react";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 
 export default function LoginPage() {
   return (
@@ -108,10 +107,6 @@ export default function LoginPage() {
             />
           </CardContent>
         </Card>
-
-        <footer className="pt-2 opacity-40">
-          <MadeWithDyad />
-        </footer>
       </div>
     </div>
   );

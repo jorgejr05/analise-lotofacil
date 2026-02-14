@@ -15,7 +15,6 @@ import {
   Pie
 } from "recharts";
 import { BarChart3, PieChart as PieIcon, Activity, Info } from "lucide-react";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 
 export default function StatisticsPage() {
   const { stats, loading } = useLotofacilStats();
@@ -163,10 +162,6 @@ export default function StatisticsPage() {
               Combine-os com as dezenas de maior frequência para um jogo equilibrado.
             </p>
           </div>
-        </div>
-
-        <div className="flex justify-center py-10 opacity-30">
-          <MadeWithDyad />
         </div>
       </div>
     </div>
