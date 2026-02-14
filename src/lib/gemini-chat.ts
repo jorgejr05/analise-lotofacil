@@ -20,7 +20,8 @@ export const processChatInteraction = async (
   if (!apiKey) return "IA indisponível: Configure sua chave API no Perfil.";
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Usando o modelo estável para evitar erros de versão
+  
+  // Usando o identificador padrão do modelo
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const gamesSummary = userGames.length > 0 
@@ -69,7 +70,17 @@ export const processChatInteraction = async (
     return response.text();
   } catch (error: any) {
     console.error("[Gemini Error]", error);
-    return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API ou tente novamente mais tarde.";
+    // Se o erro for 404, tentamos o modelo pro como fallback
+    if (error.message?.includes("404") || error.message?.includes("not found")) {
+      try {
+        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await fallbackModel.generateContent(messages[messages.length - 1].content);
+        return result.response.text();
+      } catch (fallbackError) {
+        return "Erro de compatibilidade de modelo. Verifique se sua chave API tem acesso ao Gemini 1.5 Flash.";
+      }
+    }
+    return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API.";
   }
 };
 
