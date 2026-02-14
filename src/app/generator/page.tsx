@@ -15,8 +15,10 @@ import { ChatInterface } from "@/components/chat-interface";
 import { registerBet } from "@/lib/finance-service";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/components/auth-provider";
 
 export default function GeneratorPage() {
+  const { profile } = useAuth();
   const { stats, loading } = useLotofacilStats();
   const [generatedGames, setGeneratedGames] = useState<number[][]>([]);
   const [insight, setInsight] = useState<string>("");
@@ -49,12 +51,12 @@ export default function GeneratorPage() {
     if (!stats) return;
     setIsSuggesting(true);
     try {
-      const suggestion = await suggestPoolViaIA(stats);
+      const suggestion = await suggestPoolViaIA(stats, profile?.gemini_api_key);
       if (suggestion) {
         setSelectedPool(suggestion.sort((a: number, b: number) => a - b));
         toast.success("IA selecionou as 20 dezenas com maior potencial!");
       } else {
-        toast.error("IA ocupada. Tente novamente em instantes.");
+        toast.error("IA ocupada ou chave inválida. Tente novamente.");
       }
     } catch (error) {
       toast.error("Erro ao consultar a IA.");
@@ -84,7 +86,7 @@ export default function GeneratorPage() {
       }
 
       setGeneratedGames(games);
-      const aiInsight = await generateGameInsight(stats, games, mode);
+      const aiInsight = await generateGameInsight(stats, games, mode, profile?.gemini_api_key);
       setInsight(aiInsight);
       toast.success(`${finalQty} jogos gerados com sucesso!`);
     } catch (error) {
@@ -92,7 +94,7 @@ export default function GeneratorPage() {
     } finally {
       setIsGenerating(false);
     }
-  }, [stats, quantity, mode, selectedPool]);
+  }, [stats, quantity, mode, selectedPool, profile]);
 
   const handleSaveGames = async () => {
     if (generatedGames.length === 0) return;
@@ -104,7 +106,6 @@ export default function GeneratorPage() {
       const valorTotal = generatedGames.length * 3.5;
       const concursoId = stats.ultimoConcurso.concurso;
 
-      // 1. Salvar os jogos no histórico de jogos
       const gamesToSave = generatedGames.map(dezenas => ({
         user_id: user.id,
         dezenas,
@@ -112,7 +113,6 @@ export default function GeneratorPage() {
       }));
       await supabase.from('jogos').insert(gamesToSave);
 
-      // 2. Registrar na banca (Real ou Simulado)
       await registerBet(user.id, concursoId, valorTotal, !isRealBet);
 
       toast.success(isRealBet ? "Aposta REAL registrada na banca!" : "Aposta SIMULADA registrada!");

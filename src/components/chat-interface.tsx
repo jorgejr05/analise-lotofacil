@@ -8,6 +8,7 @@ import { Send, Mic, Square, Loader2, Bot } from "lucide-react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { processChatInteraction, transcribeAudio } from "@/lib/gemini-chat";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth-provider";
 
 interface ChatInterfaceProps {
   stats: any;
@@ -15,6 +16,7 @@ interface ChatInterfaceProps {
 }
 
 export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) => {
+  const { profile } = useAuth();
   const [messages, setMessages] = useState<any[]>([]);
   const [userGames, setUserGames] = useState<any[]>([]);
   const [backtests, setBacktests] = useState<any[]>([]);
@@ -29,7 +31,6 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Buscar jogos e backtests para o contexto da IA
       const [gamesRes, backtestsRes] = await Promise.all([
         supabase.from('jogos').select('*').order('criado_em', { ascending: false }).limit(20),
         supabase.from('backtests').select('*').order('created_at', { ascending: false }).limit(5)
@@ -59,7 +60,13 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     batchTimer.current = setTimeout(async () => {
       setIsTyping(true);
       try {
-        const response = await processChatInteraction([...messages, newMessage], stats, userGames, backtests);
+        const response = await processChatInteraction(
+          [...messages, newMessage], 
+          stats, 
+          userGames, 
+          backtests,
+          profile?.gemini_api_key
+        );
         
         const genMatch = response.match(/\[GENERATE:(\d+)\]/);
         let cleanResponse = response.replace(/\[GENERATE:\d+\]/g, "").trim();
@@ -90,7 +97,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     if (isRecording) {
       const base64 = await stopRecording();
       setIsTyping(true);
-      const transcription = await transcribeAudio(base64);
+      const transcription = await transcribeAudio(base64, profile?.gemini_api_key);
       setIsTyping(false);
       sendMessage(transcription, 'audio');
     } else {

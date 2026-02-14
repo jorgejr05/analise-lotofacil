@@ -15,7 +15,10 @@ import {
   Loader2, 
   ShieldCheck,
   UserCircle,
-  KeyRound
+  KeyRound,
+  BrainCircuit,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,9 +29,11 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
+    gemini_api_key: "",
   });
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -43,6 +48,7 @@ export default function ProfilePage() {
       setFormData({
         first_name: profile.first_name || "",
         last_name: profile.last_name || "",
+        gemini_api_key: profile.gemini_api_key || "",
       });
     }
   }, [user, profile]);
@@ -95,6 +101,7 @@ export default function ProfilePage() {
         .update({
           first_name: formData.first_name,
           last_name: formData.last_name,
+          gemini_api_key: formData.gemini_api_key,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -206,7 +213,7 @@ export default function ProfilePage() {
             <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
               <CardHeader className="bg-slate-900 text-white p-6">
                 <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                  <User className="h-4 w-4 text-indigo-400" /> Dados Pessoais
+                  <User className="h-4 w-4 text-indigo-400" /> Dados Pessoais & IA
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8">
@@ -231,6 +238,32 @@ export default function ProfilePage() {
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-2 pt-4 border-t border-slate-50">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                        <BrainCircuit className="h-3 w-3" /> Google Gemini API Key
+                      </Label>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="text-slate-400 hover:text-indigo-600 transition-colors"
+                      >
+                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <Input 
+                      type={showApiKey ? "text" : "password"}
+                      value={formData.gemini_api_key} 
+                      onChange={(e) => setFormData({...formData, gemini_api_key: e.target.value})}
+                      placeholder="Cole sua chave API aqui"
+                      className="h-12 rounded-xl border-slate-100 bg-indigo-50/30 focus-visible:ring-indigo-600 font-mono text-xs"
+                    />
+                    <p className="text-[8px] font-bold text-slate-400 uppercase leading-relaxed">
+                      Sua chave é usada apenas para suas consultas de IA, garantindo maior velocidade e privacidade.
+                    </p>
+                  </div>
+
                   <Button 
                     type="submit" 
                     disabled={updating}

@@ -2,11 +2,11 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const generateGameInsight = async (stats: any, games: number[][], mode: 'ia' | 'fechamento' = 'ia') => {
-  const apiKey = process.env.GEMINI_API_KEY;
+export const generateGameInsight = async (stats: any, games: number[][], mode: 'ia' | 'fechamento' = 'ia', userApiKey?: string) => {
+  const apiKey = userApiKey || process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    return "Aguardando ativação da IA: Configure a Secret 'GEMINI_API_KEY'.";
+    return "Aguardando ativação da IA: Configure sua chave API no Perfil.";
   }
 
   const quentes = Object.entries(stats.freqTotal || {})
@@ -35,12 +35,12 @@ export const generateGameInsight = async (stats: any, games: number[][], mode: '
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (error) {
-    return "Análise estatística concluída. (IA em standby)";
+    return "Análise estatística concluída. (IA em standby ou chave inválida)";
   }
 };
 
-export const suggestPoolViaIA = async (stats: any) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+export const suggestPoolViaIA = async (stats: any, userApiKey?: string) => {
+  const apiKey = userApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   const prompt = `
