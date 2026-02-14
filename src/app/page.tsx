@@ -61,7 +61,7 @@ export default function Dashboard() {
   const getPrizeByHits = (hits: number) => {
     // Fallback para prêmios fixos da Lotofácil conforme solicitado
     if (hits === 11) return formatCurrency(7);
-    if (hits === 12) return formatCurrency(12);
+    if (hits === 12) return formatCurrency(14);
     if (hits === 13) return formatCurrency(35);
 
     const premiacao = stats?.ultimoConcurso?.premiacao_json;

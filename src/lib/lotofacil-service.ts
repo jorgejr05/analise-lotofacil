@@ -137,9 +137,9 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     };
   });
 
-  // Injeção de valores fixos conforme solicitado
+  // Injeção de valores fixos - Corrigido: 12 acertos = R$ 14,00
   if (!prizesMap[11] || prizesMap[11].valor <= 0) prizesMap[11] = { valor: 7, ganhadores: prizesMap[11]?.ganhadores || 0 };
-  if (!prizesMap[12] || prizesMap[12].valor <= 0) prizesMap[12] = { valor: 12, ganhadores: prizesMap[12]?.ganhadores || 0 };
+  if (!prizesMap[12] || prizesMap[12].valor <= 0) prizesMap[12] = { valor: 14, ganhadores: prizesMap[12]?.ganhadores || 0 };
   if (!prizesMap[13] || prizesMap[13].valor <= 0) prizesMap[13] = { valor: 35, ganhadores: prizesMap[13]?.ganhadores || 0 };
 
   const premiacao_json = [15, 14, 13, 12, 11].map(hits => ({
