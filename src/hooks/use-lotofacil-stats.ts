@@ -8,45 +8,45 @@ export const useLotofacilStats = () => {
   const calculateStats = async () => {
     setLoading(true);
     try {
+      // Buscamos um lote maior para ter dados de todas as janelas
       const { data: concursos } = await supabase
         .from('concursos')
         .select('*')
         .order('concurso', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (!concursos || concursos.length === 0) return;
 
-      const freqTotal: Record<number, number> = {};
+      const calcFreq = (list: any[]) => {
+        const freq: Record<number, number> = {};
+        for (let i = 1; i <= 25; i++) freq[i] = 0;
+        list.forEach(c => c.dezenas.forEach((d: number) => freq[d]++));
+        // Normalizar para porcentagem baseada no tamanho da lista
+        Object.keys(freq).forEach(k => freq[Number(k)] = (freq[Number(k)] / list.length) * 100);
+        return freq;
+      };
+
+      const freq50 = calcFreq(concursos.slice(0, 50));
+      const freq200 = calcFreq(concursos.slice(0, 200));
+      const freqTotal = calcFreq(concursos);
+
       const atraso: Record<number, number> = {};
-      
-      // Inicializar
-      for (let i = 1; i <= 25; i++) {
-        freqTotal[i] = 0;
-        atraso[i] = 0;
-      }
-
-      concursos.forEach((c) => {
-        c.dezenas.forEach((d: number) => {
-          freqTotal[d]++;
-        });
-      });
-
-      // Calcular atraso (concursos desde a última aparição)
       for (let i = 1; i <= 25; i++) {
         const lastIndex = concursos.findIndex(c => c.dezenas.includes(i));
         atraso[i] = lastIndex === -1 ? 100 : lastIndex;
       }
 
-      const somaMedia = concursos.reduce((acc, c) => acc + c.soma, 0) / concursos.length;
-      const paresMedia = concursos.reduce((acc, c) => acc + c.pares, 0) / concursos.length;
+      const somaMedia = concursos.slice(0, 100).reduce((acc, c) => acc + c.soma, 0) / 100;
+      const paresMedia = concursos.slice(0, 100).reduce((acc, c) => acc + c.pares, 0) / 100;
       
-      // Calcular média de repetidas (ignorando o primeiro concurso da lista se não tiver referência)
       const concursosComRepetidas = concursos.filter(c => c.repetidas_anterior !== null);
       const repetidasMedia = concursosComRepetidas.length > 0
-        ? concursosComRepetidas.reduce((acc, c) => acc + (c.repetidas_anterior || 0), 0) / concursosComRepetidas.length
+        ? concursosComRepetidas.slice(0, 100).reduce((acc, c) => acc + (c.repetidas_anterior || 0), 0) / 100
         : 9;
 
       setStats({
+        freq50,
+        freq200,
         freqTotal,
         atraso,
         somaMedia,

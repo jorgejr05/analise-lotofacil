@@ -1,6 +1,8 @@
 import { Concurso } from "./lotofacil-service";
 
 interface Stats {
+  freq50: Record<number, number>;
+  freq200: Record<number, number>;
   freqTotal: Record<number, number>;
   atraso: Record<number, number>;
   somaMedia: number;
@@ -9,57 +11,71 @@ interface Stats {
 }
 
 export const generateProbabilisticGames = (stats: Stats, quantity: number = 1): number[][] => {
-  const { freqTotal, atraso, ultimoConcurso } = stats;
+  const { freq50, freq200, freqTotal, atraso, ultimoConcurso } = stats;
   const scores: Record<number, number> = {};
 
-  // 1. Calcular Scores Individuais (01-25)
+  // CÁLCULO DO SCORE ADAPTATIVO (Fórmula de Elite)
   for (let i = 1; i <= 25; i++) {
-    const freq = (freqTotal[i] || 0) / 100; // Normalizado 0-1
-    const atr = Math.min((atraso[i] || 0) / 10, 1); // Normalizado 0-1 (cap em 10 concursos)
+    const f50 = (freq50[i] || 0) / 100;   // Peso 35%
+    const f200 = (freq200[i] || 0) / 100; // Peso 30%
+    const fTot = (freqTotal[i] || 0) / 100; // Peso 20%
+    const atr = Math.min((atraso[i] || 0) / 10, 1); // Peso 15% (cap em 10 concursos)
     
-    // Fórmula: (freq * 0.4) + (atraso * 0.3) + (random * 0.3 para variabilidade)
-    // Ajustado para garantir que números quentes e atrasados tenham peso
-    scores[i] = (freq * 0.45) + (atr * 0.35) + (Math.random() * 0.2);
+    // A soma dos pesos deve ser 1.0 (ou 100%)
+    scores[i] = (f50 * 0.35) + (f200 * 0.30) + (fTot * 0.20) + (atr * 0.15);
   }
 
   const games: number[][] = [];
+  let attempts = 0;
 
-  while (games.length < quantity) {
-    // Ordenar dezenas por score e adicionar um pouco de ruído para não gerar sempre o mesmo
+  while (games.length < quantity && attempts < 1000) {
+    attempts++;
+    
+    // Adicionamos um fator de ruído (vizinhança) para não gerar sempre o mesmo jogo
     const sortedDezenas = Object.entries(scores)
-      .map(([num, score]) => ({ num: Number(num), score: score + (Math.random() * 0.1) }))
+      .map(([num, score]) => ({ 
+        num: Number(num), 
+        score: score + (Math.random() * 0.15) // Ruído para exploração de novas combinações
+      }))
       .sort((a, b) => b.score - a.score);
 
-    // Tentar montar um jogo que respeite os filtros básicos
+    // Estratégia de Composição: 
+    // Pegar 9 das top 12 (Base forte)
+    // Pegar 4 das intermediárias (Equilíbrio)
+    // Pegar 2 das frias/atrasadas (Surpresa)
+    const top = sortedDezenas.slice(0, 12).map(d => d.num);
+    const mid = sortedDezenas.slice(12, 18).map(d => d.num);
+    const low = sortedDezenas.slice(18).map(d => d.num);
+    
     let dezenas: number[] = [];
     
-    // Estratégia: Pegar top 10 e completar com 5 aleatórios do resto para manter equilíbrio
-    const top12 = sortedDezenas.slice(0, 12).map(d => d.num);
-    const rest = sortedDezenas.slice(12).map(d => d.num);
-    
-    dezenas = [...top12];
+    // Sorteio interno para variação
+    while (dezenas.length < 9) {
+      const n = top[Math.floor(Math.random() * top.length)];
+      if (!dezenas.includes(n)) dezenas.push(n);
+    }
+    while (dezenas.length < 13) {
+      const n = mid[Math.floor(Math.random() * mid.length)];
+      if (!dezenas.includes(n)) dezenas.push(n);
+    }
     while (dezenas.length < 15) {
-      const randomIndex = Math.floor(Math.random() * rest.length);
-      const num = rest[randomIndex];
-      if (!dezenas.includes(num)) {
-        dezenas.push(num);
-      }
+      const n = low[Math.floor(Math.random() * low.length)];
+      if (!dezenas.includes(n)) dezenas.push(n);
     }
 
     dezenas.sort((a, b) => a - b);
 
-    // Validação de Filtros Profissionais
+    // Validação de Filtros Profissionais (Obrigatório)
     const soma = dezenas.reduce((a, b) => a + b, 0);
     const pares = dezenas.filter(n => n % 2 === 0).length;
     const repetidas = dezenas.filter(n => ultimoConcurso.dezenas.includes(n)).length;
 
-    // Filtros: Soma (160-220), Pares (7-9), Repetidas (8-10)
-    const isSomaOk = soma >= 160 && soma <= 220;
+    // Filtros de Ouro da Lotofácil
+    const isSomaOk = soma >= 170 && soma <= 215;
     const isParesOk = pares >= 7 && pares <= 9;
     const isRepetidasOk = repetidas >= 8 && repetidas <= 10;
 
-    // Se passar nos filtros ou se for a 50ª tentativa (para evitar loop infinito)
-    if ((isSomaOk && isParesOk && isRepetidasOk) || games.length > 100) {
+    if (isSomaOk && isParesOk && isRepetidasOk) {
       games.push(dezenas);
     }
   }
