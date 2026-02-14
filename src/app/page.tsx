@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Hash, Clock, Sparkles, Flame, Snowflake } from "lucide-react";
+import { RefreshCw, TrendingUp, Hash, Clock, Sparkles, Flame, Snowflake, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -66,6 +66,10 @@ export default function Dashboard() {
   const quentes = stats ? getTopNumbers(stats.freqTotal, 10) : [];
   const frios = stats ? getTopNumbers(stats.freqTotal, 10, true) : [];
 
+  // Extrair prêmio de 15 pontos
+  const premio15 = stats?.ultimoConcurso?.premiacao_json?.find((p: any) => p.descricao === "15 acertos");
+  const valorFormatado = premio15?.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || "R$ ---";
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
@@ -93,16 +97,16 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
             <Hash className="h-5 w-5 text-indigo-500" />
             <div>
-              <div className="text-2xl font-black tracking-tighter">{stats?.ultimoConcurso?.concurso}</div>
+              <div className="text-2xl font-black tracking-tighter">#{stats?.ultimoConcurso?.concurso}</div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Concurso</p>
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
-            <TrendingUp className="h-5 w-5 text-emerald-500" />
+            <Banknote className="h-5 w-5 text-emerald-500" />
             <div>
-              <div className="text-2xl font-black tracking-tighter">{Math.round(stats?.somaMedia)}</div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Soma Média</p>
+              <div className="text-lg md:text-xl font-black tracking-tighter text-emerald-600">{valorFormatado}</div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prêmio 15 Pts</p>
             </div>
           </div>
 

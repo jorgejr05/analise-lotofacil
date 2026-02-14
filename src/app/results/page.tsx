@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar, Hash, ChevronRight, ChevronLeft } from "lucide-react";
+import { Search, Calendar, Hash, ChevronRight, ChevronLeft, Banknote, Users } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
 export default function ResultsPage() {
@@ -59,7 +59,7 @@ export default function ResultsPage() {
           </div>
         </header>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-[2rem]" />
@@ -67,39 +67,58 @@ export default function ResultsPage() {
           ) : (
             results.map((res) => (
               <Card key={res.id} className="border-none shadow-lg rounded-[2rem] bg-white overflow-hidden group hover:shadow-xl transition-all">
-                <CardContent className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
-                  <div className="flex flex-col items-center md:items-start gap-1 min-w-[120px]">
-                    <div className="text-2xl font-black tracking-tighter text-slate-900">#{res.concurso}</div>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
-                      <Calendar className="h-3 w-3" /> {formatDate(res.data)}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 flex flex-wrap justify-center md:justify-start gap-2">
-                    {res.dezenas.map((num: number) => (
-                      <div 
-                        key={num} 
-                        className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-sm font-black text-slate-700 shadow-inner group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors"
-                      >
-                        {num.toString().padStart(2, '0')}
+                <CardContent className="p-0">
+                  <div className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 border-b border-slate-50">
+                    <div className="flex flex-col items-center md:items-start gap-1 min-w-[120px]">
+                      <div className="text-2xl font-black tracking-tighter text-slate-900">#{res.concurso}</div>
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
+                        <Calendar className="h-3 w-3" /> {formatDate(res.data)}
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="flex-1 flex flex-wrap justify-center md:justify-start gap-2">
+                      {res.dezenas.map((num: number) => (
+                        <div 
+                          key={num} 
+                          className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-sm font-black text-slate-700 shadow-inner group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors"
+                        >
+                          {num.toString().padStart(2, '0')}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 md:border-l border-slate-100 md:pl-6">
+                      <div className="text-center">
+                        <div className="text-xs font-black text-slate-900">{res.soma}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Soma</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs font-black text-slate-900">{res.pares}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Pares</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs font-black text-slate-900">{res.repetidas_anterior || '-'}</div>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase">Repet.</div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 md:border-l border-slate-100 md:pl-6">
-                    <div className="text-center">
-                      <div className="text-xs font-black text-slate-900">{res.soma}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Soma</div>
+                  {/* Detalhamento de Premiação */}
+                  {res.premiacao_json && (
+                    <div className="bg-slate-50/50 p-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+                      {res.premiacao_json.map((premio: any, idx: number) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{premio.descricao}</div>
+                          <div className="text-[10px] font-black text-indigo-600">
+                            {premio.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                          <div className="flex items-center gap-1 text-[8px] font-bold text-slate-400">
+                            <Users className="h-2 w-2" /> {premio.ganhadores} ganhadores
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-center">
-                      <div className="text-xs font-black text-slate-900">{res.pares}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Pares</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs font-black text-slate-900">{res.repetidas_anterior || '-'}</div>
-                      <div className="text-[8px] font-bold text-slate-400 uppercase">Repet.</div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             ))

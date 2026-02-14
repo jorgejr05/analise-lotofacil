@@ -8,6 +8,7 @@ export interface Concurso {
   pares: number;
   impares: number;
   repetidas_anterior?: number;
+  premiacao_json?: any; // Novo campo para prêmios
 }
 
 export const fetchLatestConcurso = async () => {
@@ -28,8 +29,6 @@ export const calculatePoints = (jogoDezenas: number[], sorteioDezenas: number[])
 
 export const updateAllGamesPoints = async () => {
   try {
-    // Atualiza apenas os jogos do usuário logado para performance, 
-    // mas os resultados (concursos) são globais.
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -86,17 +85,16 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     soma,
     pares,
     impares,
-    repetidas_anterior
+    repetidas_anterior,
+    premiacao_json: data.premiacoes // Capturando o array de premiações
   };
 };
 
 export const syncLatestResults = async () => {
   try {
-    // 1. Busca o último resultado na API
     const latestApi = await fetchLatestConcurso();
     const latestNum = Number(latestApi.concurso);
 
-    // 2. Verifica o último resultado salvo GLOBALMENTE no banco
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -106,17 +104,14 @@ export const syncLatestResults = async () => {
 
     const startFrom = lastSaved ? lastSaved.concurso + 1 : 1;
 
-    // Se o banco já estiver em dia com a API, apenas atualiza os pontos dos jogos
-    if (startFrom > latestNum) {
-      await updateAllGamesPoints();
-      return { message: 'Sistema global já está atualizado.' };
-    }
+    // Se o banco já estiver em dia, mas o último salvo não tem premiação (ex: sincronizado antes do rateio)
+    // vamos forçar a atualização do último concurso também.
+    const syncStart = Math.max(1, startFrom - 1);
 
-    // 3. Sincroniza apenas o que falta (incremental)
-    const limit = 15; // Pequenos lotes para não sobrecarregar
+    const limit = 10; 
     let count = 0;
 
-    for (let i = startFrom; i <= latestNum && count < limit; i++) {
+    for (let i = syncStart; i <= latestNum && count < limit; i++) {
       const data = await fetchConcursoByNumber(i);
       
       const { data: anterior } = await supabase
@@ -130,12 +125,11 @@ export const syncLatestResults = async () => {
       count++;
     }
 
-    // 4. Atualiza pontos dos jogos do usuário atual
     await updateAllGamesPoints();
 
     return { 
       message: count > 0 
-        ? `Sincronizados ${count} novos concursos para todos os usuários!` 
+        ? `Sincronizados ${count} concursos com dados de premiação!` 
         : 'Dados globais conferidos.' 
     };
   } catch (error) {
