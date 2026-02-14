@@ -49,7 +49,7 @@ export const runBacktestBatch = async (config: BacktestConfig, backtestId: strin
     } else {
       // Usa o modelo adaptativo (Windowed Probability)
       const stats = calculateWindowedStats(pastConcursos);
-      generatedGames = generateProbabilisticGames(stats as any, gamesPerContest);
+      generatedGames = await generateProbabilisticGames(stats as any, gamesPerContest);
     }
 
     const points = generatedGames.map(game => 

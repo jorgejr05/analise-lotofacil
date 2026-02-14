@@ -57,9 +57,10 @@ export async function generateAdvancedGames(count: number = 6) {
 
 /**
  * Mantendo a função original para compatibilidade com o Laboratório (Backtests).
+ * Transformada em async para cumprir requisitos de Server Actions.
  */
-export const generateProbabilisticGames = (stats: any, quantity: number = 1): number[][] => {
-  const { freq50, freq200, freqTotal, atraso, ultimoConcurso } = stats;
+export const generateProbabilisticGames = async (stats: any, quantity: number = 1): Promise<number[][]> => {
+  const { freq50, freq200, freqTotal, atraso } = stats;
   const games: number[][] = [];
 
   for (let q = 0; q < quantity; q++) {
