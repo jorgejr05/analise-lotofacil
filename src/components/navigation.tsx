@@ -6,6 +6,7 @@ import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Be
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const Navigation = () => {
   const pathname = usePathname();
@@ -25,8 +26,8 @@ export const Navigation = () => {
 
   return (
     <>
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r p-6 z-50">
-        <div className="mb-10 px-2 flex flex-col gap-4">
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r z-50">
+        <div className="p-6 pb-4 flex flex-col gap-4">
           <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
             <BarChart3 className="h-7 w-7" /> LOTOEXPERT
           </h2>
@@ -49,30 +50,32 @@ export const Navigation = () => {
           )}
         </div>
         
-        <ul className="space-y-2 flex-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-5 py-4 transition-all duration-300",
-                    isActive 
-                      ? "bg-indigo-600 text-white rounded-tr-3xl rounded-bl-3xl shadow-lg shadow-indigo-100 font-bold translate-x-1" 
-                      : "text-slate-500 hover:bg-slate-50 rounded-xl"
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-sm">{item.name}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <ScrollArea className="flex-1 px-4">
+          <ul className="space-y-2 py-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-5 py-4 transition-all duration-300",
+                      isActive 
+                        ? "bg-indigo-600 text-white rounded-tr-3xl rounded-bl-3xl shadow-lg shadow-indigo-100 font-bold translate-x-1" 
+                        : "text-slate-500 hover:bg-slate-50 rounded-xl"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-sm">{item.name}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </ScrollArea>
 
-        <div className="pt-6 border-t border-slate-100">
+        <div className="p-6 pt-4 border-t border-slate-100 mt-auto">
           <button
             onClick={() => signOut()}
             className="flex items-center gap-3 px-5 py-4 w-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-300 group"
