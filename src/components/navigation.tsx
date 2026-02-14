@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Beaker, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const Navigation = () => {
   const pathname = usePathname();
-  const { signOut, user } = useAuth();
+  const { signOut, user, profile } = useAuth();
 
   if (pathname === "/login") return null;
 
@@ -25,12 +26,28 @@ export const Navigation = () => {
   return (
     <>
       <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r p-6 z-50">
-        <div className="mb-10 px-2">
+        <div className="mb-10 px-2 flex flex-col gap-4">
           <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
             <BarChart3 className="h-7 w-7" /> LOTOEXPERT
           </h2>
+          
           {user && (
-            <p className="text-[10px] text-slate-400 truncate mt-1 font-medium uppercase tracking-widest">{user.email}</p>
+            <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-2xl border border-slate-100">
+              <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                <AvatarImage src={profile?.avatar_url} className="object-cover object-center" />
+                <AvatarFallback className="bg-indigo-600 text-white text-xs font-black">
+                  {profile?.first_name?.[0] || user.email?.[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col min-w-0">
+                <p className="text-xs font-black text-slate-900 truncate uppercase italic">
+                  {profile?.first_name ? `${profile.first_name}` : 'Especialista'}
+                </p>
+                <p className="text-[9px] text-slate-400 truncate font-bold uppercase tracking-tighter">
+                  {user.email}
+                </p>
+              </div>
+            </div>
           )}
         </div>
         

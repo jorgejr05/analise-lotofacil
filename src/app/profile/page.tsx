@@ -15,44 +15,37 @@ import {
   Loader2, 
   ShieldCheck,
   UserCircle,
-  KeyRound,
-  Upload
+  KeyRound
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/components/auth-provider";
 
 export default function ProfilePage() {
+  const { user, profile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [profile, setProfile] = useState<any>({
+  const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
-    avatar_url: ""
   });
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+    if (user) {
       setEmail(user.email || "");
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (data) setProfile(data);
       setLoading(false);
-    };
-
-    fetchProfile();
-  }, []);
+    }
+    if (profile) {
+      setFormData({
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+      });
+    }
+  }, [user, profile]);
 
   const handleUploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -60,27 +53,21 @@ export default function ProfilePage() {
       if (!event.target.files || event.target.files.length === 0) return;
 
       const file = event.target.files[0];
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/avatar-${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
-      // Upload para o Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Obter URL pública
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Atualizar estado e banco de dados
-      setProfile({ ...profile, avatar_url: publicUrl });
-      
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
@@ -88,6 +75,7 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError;
 
+      await refreshProfile();
       toast.success("Foto de perfil atualizada!");
     } catch (error: any) {
       toast.error("Erro no upload: " + error.message);
@@ -100,19 +88,19 @@ export default function ProfilePage() {
     e.preventDefault();
     setUpdating(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name: profile.first_name,
-          last_name: profile.last_name,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
       if (error) throw error;
+      await refreshProfile();
       toast.success("Perfil atualizado com sucesso!");
     } catch (error) {
       toast.error("Erro ao atualizar perfil.");
@@ -126,16 +114,22 @@ export default function ProfilePage() {
     setUpdating(true);
     try {
       const updates: any = {};
-      if (email) updates.email = email;
+      if (email !== user?.email) updates.email = email;
       if (newPassword) updates.password = newPassword;
+
+      if (Object.keys(updates).length === 0) {
+        toast.info("Nenhuma alteração de segurança detectada.");
+        setUpdating(false);
+        return;
+      }
 
       const { error } = await supabase.auth.updateUser(updates);
       if (error) throw error;
 
       toast.success("Dados de segurança atualizados!");
       setNewPassword("");
-    } catch (error) {
-      toast.error("Erro ao atualizar segurança.");
+    } catch (error: any) {
+      toast.error("Erro: " + error.message);
     } finally {
       setUpdating(false);
     }
@@ -166,9 +160,12 @@ export default function ProfilePage() {
               <CardContent className="p-8 flex flex-col items-center text-center space-y-4">
                 <div className="relative group">
                   <Avatar className="h-32 w-32 border-4 border-slate-50 shadow-2xl overflow-hidden">
-                    <AvatarImage src={profile.avatar_url} className="object-cover" />
+                    <AvatarImage 
+                      src={profile?.avatar_url} 
+                      className="object-cover object-center w-full h-full" 
+                    />
                     <AvatarFallback className="bg-indigo-600 text-white text-3xl font-black">
-                      {profile.first_name?.[0]}{profile.last_name?.[0]}
+                      {formData.first_name?.[0] || user?.email?.[0].toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   
@@ -191,9 +188,9 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter">
-                    {profile.first_name} {profile.last_name}
+                    {formData.first_name} {formData.last_name}
                   </h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{email}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{user?.email}</p>
                 </div>
                 <div className="pt-4 w-full">
                   <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 flex items-center gap-3">
@@ -218,8 +215,8 @@ export default function ProfilePage() {
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nome</Label>
                       <Input 
-                        value={profile.first_name} 
-                        onChange={(e) => setProfile({...profile, first_name: e.target.value})}
+                        value={formData.first_name} 
+                        onChange={(e) => setFormData({...formData, first_name: e.target.value})}
                         placeholder="Seu nome"
                         className="h-12 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-bold"
                       />
@@ -227,8 +224,8 @@ export default function ProfilePage() {
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sobrenome</Label>
                       <Input 
-                        value={profile.last_name} 
-                        onChange={(e) => setProfile({...profile, last_name: e.target.value})}
+                        value={formData.last_name} 
+                        onChange={(e) => setFormData({...formData, last_name: e.target.value})}
                         placeholder="Seu sobrenome"
                         className="h-12 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-bold"
                       />
