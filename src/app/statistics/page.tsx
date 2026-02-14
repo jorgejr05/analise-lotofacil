@@ -21,14 +21,13 @@ export default function StatisticsPage() {
 
   if (loading || !stats) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white">
-        <Activity className="h-12 w-12 animate-pulse text-indigo-200" />
-        <p className="text-slate-900 font-black tracking-tighter text-xl italic uppercase">Processando Big Data...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white dark:bg-slate-950">
+        <Activity className="h-12 w-12 animate-pulse text-indigo-200 dark:text-indigo-900" />
+        <p className="text-slate-900 dark:text-slate-100 font-black tracking-tighter text-xl italic uppercase">Processando Big Data...</p>
       </div>
     );
   }
 
-  // Preparar dados para o gráfico de frequência
   const freqData = Object.entries(stats.freqTotal)
     .map(([num, freq]) => ({
       name: num.toString().padStart(2, '0'),
@@ -36,7 +35,6 @@ export default function StatisticsPage() {
     }))
     .sort((a, b) => Number(a.name) - Number(b.name));
 
-  // Preparar dados para o gráfico de atraso
   const atrasoData = Object.entries(stats.atraso)
     .map(([num, atr]) => ({
       name: num.toString().padStart(2, '0'),
@@ -44,7 +42,6 @@ export default function StatisticsPage() {
     }))
     .sort((a, b) => Number(a.name) - Number(b.name));
 
-  // Dados para Par/Ímpar
   const pares = Math.round(stats.paresMedia);
   const impares = 15 - pares;
   const pieData = [
@@ -53,19 +50,18 @@ export default function StatisticsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 md:pl-64 pb-32 transition-colors">
       <div className="p-5 md:p-10 max-w-6xl mx-auto space-y-8">
         <header className="space-y-1">
           <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Análise de Tendências</span>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tighter uppercase italic leading-none">
             Estatísticas <span className="text-indigo-600">Avançadas</span>
           </h1>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Gráfico de Frequência */}
-          <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
-            <CardHeader className="bg-slate-900 text-white p-6">
+          <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white dark:bg-slate-900 overflow-hidden">
+            <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-6">
               <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-indigo-400" /> Frequência das Dezenas
               </CardTitle>
@@ -73,7 +69,7 @@ export default function StatisticsPage() {
             <CardContent className="p-6 h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={freqData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:opacity-10" />
                   <XAxis dataKey="name" fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip 
@@ -90,9 +86,8 @@ export default function StatisticsPage() {
             </CardContent>
           </Card>
 
-          {/* Distribuição Par/Ímpar */}
-          <Card className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
-            <CardHeader className="bg-slate-900 text-white p-6">
+          <Card className="border-none shadow-xl rounded-[2.5rem] bg-white dark:bg-slate-900 overflow-hidden">
+            <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-6">
               <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
                 <PieIcon className="h-5 w-5 text-orange-400" /> Equilíbrio P/I
               </CardTitle>
@@ -116,8 +111,8 @@ export default function StatisticsPage() {
               </ResponsiveContainer>
               <div className="mt-4 space-y-2 w-full">
                 {pieData.map((item) => (
-                  <div key={item.name} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                    <span className="text-[10px] font-black uppercase text-slate-500">{item.name}</span>
+                  <div key={item.name} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                    <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">{item.name}</span>
                     <span className="text-sm font-black" style={{ color: item.color }}>{item.value} de 15</span>
                   </div>
                 ))}
@@ -125,9 +120,8 @@ export default function StatisticsPage() {
             </CardContent>
           </Card>
 
-          {/* Gráfico de Atraso */}
-          <Card className="lg:col-span-3 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
-            <CardHeader className="bg-slate-900 text-white p-6">
+          <Card className="lg:col-span-3 border-none shadow-xl rounded-[2.5rem] bg-white dark:bg-slate-900 overflow-hidden">
+            <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-6">
               <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
                 <Activity className="h-5 w-5 text-rose-400" /> Mapa de Atraso (Concursos sem sair)
               </CardTitle>
@@ -135,7 +129,7 @@ export default function StatisticsPage() {
             <CardContent className="p-6 h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={atrasoData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:opacity-10" />
                   <XAxis dataKey="name" fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip 
@@ -153,11 +147,11 @@ export default function StatisticsPage() {
           </Card>
         </div>
 
-        <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 flex gap-4 items-start">
-          <Info className="h-6 w-6 text-indigo-600 shrink-0 mt-1" />
+        <div className="bg-indigo-50 dark:bg-indigo-900/10 p-6 rounded-[2rem] border border-indigo-100 dark:border-indigo-900/20 flex gap-4 items-start">
+          <Info className="h-6 w-6 text-indigo-600 dark:text-indigo-400 shrink-0 mt-1" />
           <div>
-            <h4 className="font-black text-indigo-900 uppercase italic text-xs mb-1">Dica do Especialista</h4>
-            <p className="text-indigo-700 text-xs leading-relaxed font-medium">
+            <h4 className="font-black text-indigo-900 dark:text-indigo-300 uppercase italic text-xs mb-1">Dica do Especialista</h4>
+            <p className="text-indigo-700 dark:text-indigo-400 text-xs leading-relaxed font-medium">
               Números com atraso superior a 4 concursos têm alta probabilidade de aparecer no próximo sorteio. 
               Combine-os com as dezenas de maior frequência para um jogo equilibrado.
             </p>

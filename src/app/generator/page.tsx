@@ -124,26 +124,26 @@ export default function GeneratorPage() {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 md:pl-64 pb-32 transition-colors">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start gap-4">
           <div className="space-y-1">
             <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Caçada ao Prêmio Máximo</span>
-            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tighter uppercase italic leading-none">
               Motor de <span className="text-indigo-600">Alta Precisão</span>
             </h1>
           </div>
           
-          <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <button 
               onClick={() => setMode('ia')}
-              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all", mode === 'ia' ? "bg-indigo-600 text-white shadow-lg" : "text-slate-400 hover:text-slate-600")}
+              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all", mode === 'ia' ? "bg-indigo-600 text-white shadow-lg" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300")}
             >
               Modo IA Preditiva
             </button>
             <button 
               onClick={() => setMode('fechamento')}
-              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all", mode === 'fechamento' ? "bg-emerald-600 text-white shadow-lg" : "text-slate-400 hover:text-slate-600")}
+              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all", mode === 'fechamento' ? "bg-emerald-600 text-white shadow-lg" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300")}
             >
               Modo Fechamento
             </button>
@@ -153,19 +153,19 @@ export default function GeneratorPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7 space-y-6">
             {mode === 'fechamento' && (
-              <Card className="border-none shadow-xl rounded-[2rem] bg-white overflow-hidden animate-in slide-in-from-top-4 duration-500">
-                <CardHeader className="bg-emerald-50 p-6 border-b border-emerald-100 flex flex-row items-center justify-between">
+              <Card className="border-none shadow-xl rounded-[2rem] bg-white dark:bg-slate-900 overflow-hidden animate-in slide-in-from-top-4 duration-500">
+                <CardHeader className="bg-emerald-50 dark:bg-emerald-900/10 p-6 border-b border-emerald-100 dark:border-emerald-900/20 flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2">
+                    <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                       <Target className="h-4 w-4" /> Seletor de Grupo (Pool)
                     </CardTitle>
-                    <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Escolha as dezenas que o sistema irá desdobrar</p>
+                    <p className="text-[9px] font-bold text-emerald-600/70 dark:text-emerald-500/70 uppercase">Escolha as dezenas que o sistema irá desdobrar</p>
                   </div>
                   <Button 
                     onClick={handleIASuggestion} 
                     disabled={isSuggesting}
                     variant="outline" 
-                    className="border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 rounded-xl h-10 text-[9px] font-black uppercase italic"
+                    className="border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl h-10 text-[9px] font-black uppercase italic"
                   >
                     {isSuggesting ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Wand2 className="h-3 w-3 mr-2" />}
                     Sugestão da IA
@@ -181,7 +181,7 @@ export default function GeneratorPage() {
                           "aspect-square rounded-xl text-sm font-black transition-all border-2",
                           selectedPool.includes(num) 
                             ? "bg-emerald-600 border-emerald-500 text-white shadow-lg scale-105" 
-                            : "bg-slate-50 border-slate-100 text-slate-400 hover:border-emerald-200"
+                            : "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-emerald-200 dark:hover:border-emerald-800"
                         )}
                       >
                         {num.toString().padStart(2, '0')}
@@ -189,24 +189,24 @@ export default function GeneratorPage() {
                     ))}
                   </div>
                   <div className="mt-4 flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-slate-400 italic">Selecionadas: {selectedPool.length}</span>
-                    <Button variant="ghost" onClick={() => setSelectedPool([])} className="text-[9px] font-black uppercase text-rose-500">Limpar Tudo</Button>
+                    <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 italic">Selecionadas: {selectedPool.length}</span>
+                    <Button variant="ghost" onClick={() => setSelectedPool([])} className="text-[9px] font-black uppercase text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">Limpar Tudo</Button>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            <Card className="border-none shadow-2xl rounded-[2rem] bg-white overflow-hidden">
-              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-50 p-6 gap-4">
-                <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
+            <Card className="border-none shadow-2xl rounded-[2rem] bg-white dark:bg-slate-900 overflow-hidden">
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-50 dark:border-slate-800 p-6 gap-4">
+                <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2 text-slate-900 dark:text-slate-100">
                   <Layers className="h-5 w-5 text-indigo-600" /> Configuração de Jogos
                 </CardTitle>
                 
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center bg-slate-50 rounded-2xl p-1 border border-slate-100">
-                    <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 text-slate-400 hover:text-indigo-600"><Minus className="h-4 w-4" /></button>
-                    <span className="w-10 text-center font-black italic">{quantity}</span>
-                    <button onClick={() => setQuantity(q => q + 1)} className="p-2 text-slate-400 hover:text-indigo-600"><Plus className="h-4 w-4" /></button>
+                  <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-2xl p-1 border border-slate-100 dark:border-slate-700">
+                    <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 text-slate-400 dark:text-slate-500 hover:text-indigo-600"><Minus className="h-4 w-4" /></button>
+                    <span className="w-10 text-center font-black italic text-slate-900 dark:text-slate-100">{quantity}</span>
+                    <button onClick={() => setQuantity(q => q + 1)} className="p-2 text-slate-400 dark:text-slate-500 hover:text-indigo-600"><Plus className="h-4 w-4" /></button>
                   </div>
 
                   <Button onClick={() => handleGenerate()} disabled={isGenerating} className={cn("rounded-tr-2xl rounded-bl-2xl px-8 h-12 shadow-lg font-black uppercase italic text-[10px] tracking-widest", mode === 'ia' ? "bg-indigo-600 hover:bg-indigo-700" : "bg-emerald-600 hover:bg-emerald-700")}>
@@ -218,20 +218,20 @@ export default function GeneratorPage() {
               <CardContent className="p-6">
                 {generatedGames.length === 0 ? (
                   <div className="py-20 text-center flex flex-col items-center gap-3">
-                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
-                      <Cpu className="h-8 w-8 text-slate-200" />
+                    <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
+                      <Cpu className="h-8 w-8 text-slate-200 dark:text-slate-700" />
                     </div>
-                    <p className="text-slate-400 font-bold text-[10px] uppercase italic tracking-widest">Aguardando comando de processamento...</p>
+                    <p className="text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase italic tracking-widest">Aguardando comando de processamento...</p>
                   </div>
                 ) : (
                   <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {generatedGames.map((game, idx) => (
-                        <div key={idx} className="p-5 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 relative group">
-                          <div className="absolute -top-2 -left-2 bg-white border border-slate-100 px-2 py-1 rounded-lg text-[8px] font-black text-slate-400 uppercase shadow-sm">Jogo {idx + 1} (15 Dezenas)</div>
+                        <div key={idx} className="p-5 bg-slate-50/50 dark:bg-slate-800/50 rounded-[1.5rem] border border-slate-100/50 dark:border-slate-700/50 relative group">
+                          <div className="absolute -top-2 -left-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-lg text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase shadow-sm">Jogo {idx + 1} (15 Dezenas)</div>
                           <div className="grid grid-cols-5 gap-2 mt-2">
                             {game.map(num => (
-                              <span key={num} className="aspect-square flex items-center justify-center bg-white border border-indigo-100 text-indigo-700 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
+                              <span key={num} className="aspect-square flex items-center justify-center bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
                                 {num.toString().padStart(2, '0')}
                               </span>
                             ))}
@@ -240,7 +240,7 @@ export default function GeneratorPage() {
                       ))}
                     </div>
                     
-                    <div className="p-6 bg-slate-900 rounded-[2rem] border border-slate-800 space-y-4">
+                    <div className="p-6 bg-slate-900 dark:bg-slate-950 rounded-[2rem] border border-slate-800 dark:border-slate-900 space-y-4">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <Wallet className="h-4 w-4 text-indigo-400" />
@@ -249,7 +249,7 @@ export default function GeneratorPage() {
                         <span className="text-sm font-black text-indigo-400">R$ {(generatedGames.length * 3.5).toFixed(2).replace('.', ',')}</span>
                       </div>
 
-                      <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
+                      <div className="flex items-center justify-between p-4 bg-slate-800/50 dark:bg-slate-900/50 rounded-2xl border border-slate-700 dark:border-slate-800">
                         <div className="flex flex-col">
                           <Label htmlFor="real-bet" className="text-[10px] font-black text-white uppercase italic">Modo de Registro</Label>
                           <span className="text-[8px] font-bold text-slate-400 uppercase">{isRealBet ? "Aposta Real (Desconta da Banca)" : "Simulação (Apenas ROI)"}</span>
@@ -286,7 +286,7 @@ export default function GeneratorPage() {
             </Card>
 
             {insight && (
-              <Card className="border-none shadow-2xl rounded-[2rem] bg-indigo-950 text-white overflow-hidden animate-in zoom-in duration-500">
+              <Card className="border-none shadow-2xl rounded-[2rem] bg-indigo-950 dark:bg-indigo-950/50 text-white overflow-hidden animate-in zoom-in duration-500">
                 <CardHeader className="bg-indigo-900/50 p-6">
                   <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2 text-indigo-300">
                     <BrainCircuit className="h-4 w-4" /> Análise de Convergência
