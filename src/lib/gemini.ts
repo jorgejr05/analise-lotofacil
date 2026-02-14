@@ -3,49 +3,88 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getInternalApiKey } from "./profile-actions";
 
-export const generateGameInsight = async (stats: any, games: number[][], mode: 'ia' | 'fechamento' = 'ia', userId?: string) => {
+export const processChatInteraction = async (
+  messages: { role: string; content: string }[],
+  stats: any,
+  userGames: any[] = [],
+  backtestResults: any[] = [],
+  userId?: string
+) => {
   let apiKey = process.env.GEMINI_API_KEY;
 
   if (userId) {
     const userKey = await getInternalApiKey(userId);
     if (userKey) apiKey = userKey;
   }
-  
-  if (!apiKey) {
-    return "Aguardando ativação da IA: Configure sua chave API no Perfil.";
-  }
 
-  const quentes = Object.entries(stats.freqTotal || {})
-    .sort(([,a]: any, [,b]: any) => b - a)
-    .slice(0, 5)
-    .map(([num]) => num)
-    .join(", ");
-
-  const prompt = `
-    Você é o LotoExpert AI. Analise estes jogos da Lotofácil gerados no modo ${mode.toUpperCase()}:
-    - Soma média histórica: ${Math.round(stats.somaMedia)}
-    - Dezenas frequentes: ${quentes}
-    - Jogos sugeridos: ${JSON.stringify(games)}
-    
-    ${mode === 'fechamento' 
-      ? "Explique como este fechamento matemático protege o apostador e por que a escolha dessas dezenas é sólida." 
-      : "Explique por que esses jogos baseados em probabilidade são equilibrados."}
-    
-    Seja breve (máximo 2 parágrafos). Use Português do Brasil.
-  `;
+  if (!apiKey) return "IA indisponível: Configure sua chave API no Perfil.";
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  
+  // Usando o identificador padrão do modelo
   const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
+  const gamesSummary = userGames.length > 0 
+    ? userGames.slice(0, 10).map(g => 
+        `- Jogo: [${g.dezenas.join(', ')}] | Pontos: ${g.pontos || 0}`
+      ).join('\n')
+    : "Nenhum jogo salvo.";
+
+  const labSummary = backtestResults.length > 0
+    ? backtestResults.slice(0, 3).map(b => 
+        `- Motor: ${b.modelo_usado} | Concursos: ${b.quantidade_concursos} | Status: ${b.status} | Eficácia (Média): ${b.resultado_json?.media?.toFixed(2) || 'N/A'}`
+      ).join('\n')
+    : "Nenhum teste de laboratório realizado ainda.";
+
+  const systemPrompt = `
+    Você é o LotoExpert AI, um consultor humano e estrategista de elite da Lotofácil.
+    
+    REGRAS CRÍTICAS:
+    1. CONHECIMENTO CIENTÍFICO: Você tem acesso aos resultados do LABORATÓRIO (Backtests). Use isso para validar suas sugestões.
+    2. FOCO TOTAL: Você só fala sobre Lotofácil, estatísticas e estratégias.
+    3. COMANDO DE GERAÇÃO: Para disparar a geração na tela, use o código: [GENERATE:X] onde X é o número de jogos.
+    4. HUMANIZAÇÃO: Seja um consultor de alto nível, use os dados para provar por que sua estratégia é boa.
+    
+    Dados de Desempenho Real (Laboratório):
+    ${labSummary}
+
+    Histórico de Jogos do Usuário:
+    ${gamesSummary}
+
+    Dados Estatísticos Atuais:
+    - Último Concurso: ${stats.ultimoConcurso.concurso}
+    - Soma Média: ${Math.round(stats.somaMedia)}
+  `;
+
   try {
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (error) {
-    return "Análise estatística concluída. (IA em standby ou chave inválida)";
+    const chat = model.startChat({
+      history: [
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Analisei os resultados do nosso laboratório e os seus jogos anteriores. Estou pronto para criar uma estratégia baseada em evidências. Como posso ajudar?" }] },
+      ],
+    });
+
+    const lastMessage = messages[messages.length - 1].content;
+    const result = await chat.sendMessage(lastMessage);
+    const response = await result.response;
+    return response.text();
+  } catch (error: any) {
+    console.error("[Gemini Error]", error);
+    // Se o erro for 404, tentamos o modelo pro como fallback
+    if (error.message?.includes("404") || error.message?.includes("not found")) {
+      try {
+        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await fallbackModel.generateContent(messages[messages.length - 1].content);
+        return result.response.text();
+      } catch (fallbackError) {
+        return "Erro de compatibilidade de modelo. Verifique se sua chave API tem acesso ao Gemini 1.5 Flash.";
+      }
+    }
+    return "Ocorreu um erro na comunicação com a IA. Verifique sua chave API.";
   }
 };
 
-export const suggestPoolViaIA = async (stats: any, userId?: string) => {
+export const transcribeAudio = async (base64Audio: string, userId?: string) => {
   let apiKey = process.env.GEMINI_API_KEY;
 
   if (userId) {
@@ -53,27 +92,19 @@ export const suggestPoolViaIA = async (stats: any, userId?: string) => {
     if (userKey) apiKey = userKey;
   }
 
-  if (!apiKey) return null;
-
-  const prompt = `
-    Com base nas estatísticas da Lotofácil:
-    - Dezenas mais frequentes (Top 10): ${JSON.stringify(Object.entries(stats.freqTotal).sort(([,a]:any,[,b]:any)=>b-a).slice(0,10).map(([n])=>n))}
-    - Dezenas com maior atraso: ${JSON.stringify(Object.entries(stats.atraso).sort(([,a]:any,[,b]:any)=>b-a).slice(0,5).map(([n])=>n))}
-    
-    Sugira um grupo de 20 dezenas para um FECHAMENTO de alta performance. 
-    Misture dezenas quentes, dezenas que devem voltar (atrasadas) e dezenas neutras.
-    Retorne APENAS um array JSON de números, exemplo: [1, 2, 3, ...]
-  `;
-
+  if (!apiKey) return "Erro na transcrição: Chave não configurada.";
+  
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
+  
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const match = text.match(/\[.*\]/);
-    return match ? JSON.parse(match[0]) : null;
+    const result = await model.generateContent([
+      "Transcreva este áudio para texto em Português do Brasil. Retorne apenas a transcrição.",
+      { inlineData: { mimeType: "audio/webm", data: base64Audio } }
+    ]);
+    return result.response.text();
   } catch (error) {
-    return null;
+    console.error("[Transcription Error]", error);
+    return "Não consegui entender o áudio.";
   }
 };
