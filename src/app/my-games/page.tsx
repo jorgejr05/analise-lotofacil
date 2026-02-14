@@ -78,9 +78,9 @@ export default function MyGamesPage() {
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-5xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-1">
+          <div className="space-y-1 w-full">
             <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Registro de Atividade</span>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-4 w-full">
               <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
                 Meus <span className="text-indigo-600">Jogos</span>
               </h1>
@@ -201,4 +201,3 @@ export default function MyGamesPage() {
       </div>
     </div>
   );
-}
