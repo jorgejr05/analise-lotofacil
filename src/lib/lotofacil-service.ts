@@ -32,7 +32,6 @@ export const updateAllGamesPoints = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Buscar jogos que ainda não foram conferidos ou que precisam de atualização
     const { data: jogos } = await supabase
       .from('jogos')
       .select('*')
@@ -41,8 +40,6 @@ export const updateAllGamesPoints = async () => {
     if (!jogos || jogos.length === 0) return;
 
     for (const jogo of jogos) {
-      // O jogo é para o concurso seguinte ao de referência (ou o próprio, dependendo da lógica de geração)
-      // Aqui assumimos que concurso_referencia é o último que a IA viu, então o jogo é para o concurso_referencia + 1
       const targetConcurso = jogo.concurso_referencia + 1;
 
       const { data: concurso } = await supabase
@@ -54,19 +51,18 @@ export const updateAllGamesPoints = async () => {
       if (concurso) {
         const pontos = calculatePoints(jogo.dezenas, concurso.dezenas);
         
-        // Atualizar pontos no jogo
         await supabase
           .from('jogos')
           .update({ pontos })
           .eq('id', jogo.id);
 
-        // Calcular prêmio se houver
         if (pontos >= 11) {
-          const premioInfo = concurso.premiacao_json?.find((p: any) => p.descricao.includes(`${pontos} acertos`));
+          const premioInfo = concurso.premiacao_json?.find((p: any) => 
+            p.descricao.toLowerCase().includes(`${pontos} acertos`)
+          );
           const valorPremiado = premioInfo?.valor || 0;
 
           if (valorPremiado > 0) {
-            // Buscar registro na banca para este concurso
             const { data: historyEntry } = await supabase
               .from('bankroll_history')
               .select('*')
@@ -88,7 +84,6 @@ export const updateAllGamesPoints = async () => {
                 })
                 .eq('id', historyEntry.id);
 
-              // Atualizar saldo atual na banca
               const { data: settings } = await supabase
                 .from('user_bankroll_settings')
                 .select('bankroll_atual')
@@ -136,7 +131,7 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     pares,
     impares,
     repetidas_anterior,
-    premiacao_json: data.premiacoes
+    premiacao_json: data.listaRateio || data.premiacoes || [] // Mapeamento corrigido para a API Heroku
   };
 };
 
@@ -155,7 +150,7 @@ export const syncLatestResults = async () => {
     const startFrom = lastSaved ? lastSaved.concurso + 1 : 1;
     const syncStart = Math.max(1, startFrom - 1);
 
-    const limit = 10; 
+    const limit = 5; 
     let count = 0;
 
     for (let i = syncStart; i <= latestNum && count < limit; i++) {
@@ -172,12 +167,11 @@ export const syncLatestResults = async () => {
       count++;
     }
 
-    // Após sincronizar novos concursos, conferir todos os jogos pendentes
     await updateAllGamesPoints();
 
     return { 
       message: count > 0 
-        ? `Sincronizados ${count} concursos com dados de premiação!` 
+        ? `Sincronizados ${count} concursos!` 
         : 'Dados globais conferidos.' 
     };
   } catch (error) {

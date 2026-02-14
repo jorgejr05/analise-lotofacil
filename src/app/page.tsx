@@ -32,7 +32,7 @@ export default function Dashboard() {
     try {
       const res = await syncLatestResults();
       toast.success(res.message);
-      await refresh(); // Força a atualização das estatísticas locais após o sync
+      await refresh(); 
     } catch (error) {
       toast.error("Erro ao sincronizar dados.");
     } finally {
@@ -55,18 +55,21 @@ export default function Dashboard() {
   const quentes = getTopNumbers(stats?.freqTotal, 10);
   const frios = getTopNumbers(stats?.freqTotal, 10, true);
 
-  // Função de busca de prêmio mais robusta (case-insensitive e flexível)
   const getPrize = (hits: number) => {
     if (!stats?.ultimoConcurso?.premiacao_json) return "R$ ---";
     
-    const searchStr = `${hits} acertos`;
-    const p = stats.ultimoConcurso.premiacao_json.find((item: any) => 
-      item.descricao.toLowerCase().includes(searchStr.toLowerCase())
-    );
+    // Procura por faixa de premiação de forma flexível (ex: "15 acertos" ou faixa 1)
+    const p = stats.ultimoConcurso.premiacao_json.find((item: any) => {
+      const desc = item.descricao?.toLowerCase() || "";
+      // Lotofácil: Faixa 1 = 15, 2 = 14, 3 = 13, 4 = 12, 5 = 11
+      const faixaMatch = item.faixa === (16 - hits);
+      const descMatch = desc.includes(`${hits} acertos`) || desc.includes(`${hits} pontos`);
+      return faixaMatch || descMatch;
+    });
     
     if (!p || !p.valor) return "R$ ---";
     
-    return p.valor.toLocaleString('pt-BR', { 
+    return Number(p.valor).toLocaleString('pt-BR', { 
       style: 'currency', 
       currency: 'BRL' 
     });
@@ -113,7 +116,7 @@ export default function Dashboard() {
           <div className="bg-white dark:bg-slate-900 p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between h-32">
             <Banknote className="h-5 w-5 text-emerald-500" />
             <div>
-              <div className="text-lg md:text-xl font-black tracking-tighter text-emerald-600">{getPrize(15)}</div>
+              <div className="text-lg md:text-xl font-black tracking-tighter text-emerald-600 truncate">{getPrize(15)}</div>
               <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Prêmio 15 Pts</p>
             </div>
           </div>
