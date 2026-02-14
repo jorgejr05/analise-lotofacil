@@ -23,9 +23,10 @@ export const useAudioRecorder = () => {
         if (e.data.size > 0) chunks.current.push(e.data);
       };
 
-      mediaRecorder.current.start();
+      // Inicia gravando em fatias de 100ms para garantir fluxo de dados
+      mediaRecorder.current.start(100);
       setIsRecording(true);
-      console.log("[useAudioRecorder] Gravação iniciada com", mimeType);
+      console.log("[useAudioRecorder] Gravação iniciada");
     } catch (err) {
       console.error("[useAudioRecorder] Erro ao acessar microfone:", err);
     }
@@ -38,9 +39,8 @@ export const useAudioRecorder = () => {
       }
 
       mediaRecorder.current.onstop = () => {
-        const blob = new Blob(chunks.current, { type: mediaRecorder.current?.mimeType || 'audio/webm' });
+        const blob = new Blob(chunks.current, { type: 'audio/webm' });
         
-        // Converter Blob para Base64 de forma robusta
         const reader = new FileReader();
         reader.readAsDataURL(blob);
         reader.onloadend = () => {
@@ -48,10 +48,8 @@ export const useAudioRecorder = () => {
           resolve(base64);
         };
         
-        // Fechar todas as faixas do stream para liberar o hardware
         mediaRecorder.current?.stream.getTracks().forEach(track => track.stop());
         setIsRecording(false);
-        console.log("[useAudioRecorder] Gravação finalizada");
       };
 
       mediaRecorder.current.stop();
