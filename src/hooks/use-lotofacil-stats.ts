@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useLotofacilStats = () => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const calculateStats = async () => {
-    setLoading(true);
+  const calculateStats = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    
     try {
       const { data: concursos } = await supabase
         .from('concursos')
@@ -14,7 +15,10 @@ export const useLotofacilStats = () => {
         .order('concurso', { ascending: false })
         .limit(500);
 
-      if (!concursos || concursos.length === 0) return;
+      if (!concursos || concursos.length === 0) {
+        setLoading(false);
+        return;
+      }
 
       const calcFreq = (list: any[]) => {
         const freq: Record<number, number> = {};
@@ -54,15 +58,15 @@ export const useLotofacilStats = () => {
         historicoRecente: concursos.slice(0, 5)
       });
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao calcular estatísticas:", error);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    calculateStats();
   }, []);
 
-  return { stats, loading, refresh: calculateStats };
+  useEffect(() => {
+    calculateStats(true);
+  }, [calculateStats]);
+
+  return { stats, loading, refresh: () => calculateStats(false) };
 };

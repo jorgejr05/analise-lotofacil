@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  // Sincronização automática silenciosa apenas no primeiro carregamento
   useEffect(() => {
     const autoSync = async () => {
       try {
@@ -37,7 +38,7 @@ export default function Dashboard() {
       }
     };
     autoSync();
-  }, [refresh]);
+  }, []); // Executa apenas uma vez ao montar
 
   const handleSync = async () => {
     setSyncing(true);
@@ -52,6 +53,7 @@ export default function Dashboard() {
     }
   };
 
+  // Só mostra o loader de tela cheia se não houver NENHUM dado ainda
   if (loading && !stats) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white">
@@ -76,11 +78,17 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col gap-1">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-400">
               <Clock className="h-3 w-3" />
               <span className="text-[10px] font-bold">{formatDateTime(now)}</span>
             </div>
+            {syncing && (
+              <div className="flex items-center gap-2 text-indigo-600 animate-pulse">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-[8px] font-black uppercase italic">Sincronizando...</span>
+              </div>
+            )}
           </div>
           <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
             Visão <span className="text-indigo-600">Geral</span>
@@ -99,7 +107,7 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-tl-[3rem] rounded-br-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between h-32">
             <Hash className="h-5 w-5 text-indigo-500" />
             <div>
-              <div className="text-2xl font-black tracking-tighter">#{stats?.ultimoConcurso?.concurso}</div>
+              <div className="text-2xl font-black tracking-tighter">#{stats?.ultimoConcurso?.concurso || '---'}</div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Concurso</p>
             </div>
           </div>
