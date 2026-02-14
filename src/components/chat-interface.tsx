@@ -53,12 +53,12 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       try {
         const response = await processChatInteraction([...messages, newMessage], stats, userGames);
         
-        // Detectar comando de geração: [GENERATE:X]
+        // Detectar comando de geração: [GENERATE:X] - Sem limite de 10
         const genMatch = response.match(/\[GENERATE:(\d+)\]/);
         let cleanResponse = response.replace(/\[GENERATE:\d+\]/g, "").trim();
 
         if (genMatch && onGenerateRequest) {
-          const qty = Math.min(parseInt(genMatch[1]), 10);
+          const qty = parseInt(genMatch[1]);
           onGenerateRequest(qty);
           cleanResponse += `\n\n*Comando executado: Gerando ${qty} jogos agora...*`;
         }
@@ -76,7 +76,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       } finally {
         setIsTyping(false);
       }
-    }, 3000); // Reduzi para 3s para ser mais responsivo
+    }, 2000);
   };
 
   const handleAudio = async () => {
@@ -136,7 +136,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         <Button variant="ghost" size="icon" onClick={handleAudio} className={cn("rounded-full h-12 w-12 shrink-0 transition-all", isRecording ? "bg-rose-500 text-white animate-pulse" : "bg-slate-50 text-slate-400 hover:text-indigo-600")}>
           {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </Button>
-        <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} placeholder="Ex: Gere 3 jogos com dezenas quentes..." className="h-12 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-medium text-xs" />
+        <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} placeholder="Ex: Gere 25 jogos com dezenas quentes..." className="h-12 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-medium text-xs" />
         <Button onClick={() => sendMessage(input)} disabled={!input.trim()} className="rounded-full h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-100 shrink-0">
           <Send className="h-5 w-5" />
         </Button>

@@ -70,7 +70,7 @@ export default function GeneratorPage() {
     }
   };
 
-  const increment = () => setQuantity(prev => Math.min(prev + 1, 10));
+  const increment = () => setQuantity(prev => prev + 1); // Removido limite de 10
   const decrement = () => setQuantity(prev => Math.max(prev - 1, 1));
 
   if (loading) return null;
