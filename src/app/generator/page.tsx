@@ -7,9 +7,10 @@ import { generateGameInsight } from "@/lib/gemini";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus } from "lucide-react";
+import { Dices, Sparkles, Save, Loader2, BrainCircuit, Rocket, Plus, Minus, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ChatInterface } from "@/components/chat-interface";
 
 export default function GeneratorPage() {
   const { stats, loading } = useLotofacilStats();
@@ -75,7 +76,7 @@ export default function GeneratorPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] md:pl-64 pb-32">
-      <div className="p-5 md:p-10 max-w-5xl mx-auto space-y-8">
+      <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
         <header className="space-y-1">
           <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Algoritmo Ativo</span>
           <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
@@ -83,8 +84,9 @@ export default function GeneratorPage() {
           </h1>
         </header>
 
-        <div className="grid grid-cols-1 gap-8">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Coluna do Gerador */}
+          <div className="lg:col-span-7 space-y-6">
             <Card className="border-none shadow-2xl rounded-[2rem] bg-white overflow-hidden">
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-50 p-6 gap-4">
                 <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
@@ -175,6 +177,15 @@ export default function GeneratorPage() {
                 </Card>
               </div>
             )}
+          </div>
+
+          {/* Coluna do Chat */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="flex items-center gap-2 px-2">
+              <MessageSquare className="h-4 w-4 text-indigo-600" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">Consultoria em Tempo Real</span>
+            </div>
+            <ChatInterface stats={stats} />
           </div>
         </div>
       </div>
