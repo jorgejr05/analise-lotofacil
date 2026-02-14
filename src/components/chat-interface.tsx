@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Mic, Square, Loader2, Bot, Check, CheckCheck, User } from "lucide-react";
+import { Send, Mic, Square, Loader2, Bot, CheckCheck, Trash2 } from "lucide-react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { processChatInteraction, transcribeAudio } from "@/lib/gemini-chat";
 import { cn } from "@/lib/utils";
@@ -28,40 +28,53 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Nome do usuário para os cards
   const userName = profile?.first_name || "Você";
 
+  // Carrega histórico de mensagens e dados de contexto
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-      const [gamesRes, backtestsRes] = await Promise.all([
+      
+      const [messagesRes, gamesRes, backtestsRes] = await Promise.all([
+        supabase.from('chat_messages').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
         supabase.from('jogos').select('*').order('criado_em', { ascending: false }).limit(20),
         supabase.from('backtests').select('*').order('created_at', { ascending: false }).limit(5)
       ]);
+
+      if (messagesRes.data) setMessages(messagesRes.data);
       if (gamesRes.data) setUserGames(gamesRes.data);
       if (backtestsRes.data) setBacktests(backtestsRes.data);
     };
     fetchData();
   }, [user]);
 
+  // Rolagem automática
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, status]);
 
   const cleanMarkdown = (text: string) => {
-    // Remove asteriscos, hashtags e outros caracteres de formatação se a IA esquecer
     return text.replace(/[*#_~`]/g, '').trim();
+  };
+
+  const handleClearChat = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from('chat_messages').delete().eq('user_id', user.id);
+      if (error) throw error;
+      setMessages([]);
+      toast.success("Histórico de conversa removido.");
+    } catch (error) {
+      toast.error("Não consegui limpar o chat agora.");
+    }
   };
 
   const sendMessage = async (content: string, type: 'text' | 'audio' = 'text') => {
     if (!content.trim() || !user) return;
 
-    const newMessage = { 
+    const userMessage = { 
       user_id: user.id, 
       role: 'user', 
       content, 
@@ -69,52 +82,52 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       created_at: new Date().toISOString() 
     };
     
-    setMessages(prev => [...prev, newMessage]);
+    // Salva mensagem do usuário no banco
+    await supabase.from('chat_messages').insert(userMessage);
+    setMessages(prev => [...prev, userMessage]);
     setInput("");
-
     setStatus("lendo");
     
-    setTimeout(async () => {
-      setStatus("analisando");
+    try {
+      const responsePromise = processChatInteraction(
+        [...messages, userMessage], 
+        stats, 
+        userGames, 
+        backtests,
+        user.id
+      );
+
+      setTimeout(() => setStatus("analisando"), 800);
+      setTimeout(() => setStatus("digitando"), 1800);
+
+      const response = await responsePromise;
       
-      try {
-        const responsePromise = processChatInteraction(
-          [...messages, newMessage], 
-          stats, 
-          userGames, 
-          backtests,
-          user.id
-        );
+      const genMatch = response.match(/\[GENERATE:(\d+)\]/);
+      let cleanResponse = cleanMarkdown(response.replace(/\[GENERATE:\d+\]/g, ""));
 
-        setTimeout(() => setStatus("digitando"), 1500);
-
-        const response = await responsePromise;
-        
-        const genMatch = response.match(/\[GENERATE:(\d+)\]/);
-        let cleanResponse = cleanMarkdown(response.replace(/\[GENERATE:\d+\]/g, ""));
-
-        if (genMatch && onGenerateRequest) {
-          const qty = parseInt(genMatch[1]);
-          onGenerateRequest(qty);
-          cleanResponse += `\n\nBeleza! Já estou gerando esses ${qty} jogos pra você agora mesmo.`;
-        }
-
-        const assistantMessage = {
-          user_id: user.id,
-          role: 'assistant',
-          content: cleanResponse,
-          type: 'text',
-          created_at: new Date().toISOString()
-        };
-        
-        setMessages(prev => [...prev, assistantMessage]);
-      } catch (error) {
-        console.error(error);
-        toast.error("Tive um probleminha aqui. Tenta de novo?");
-      } finally {
-        setStatus(null);
+      if (genMatch && onGenerateRequest) {
+        const qty = parseInt(genMatch[1]);
+        onGenerateRequest(qty);
+        cleanResponse += `\n\nBeleza! Já estou gerando esses ${qty} jogos pra você agora mesmo.`;
       }
-    }, 1000);
+
+      const assistantMessage = {
+        user_id: user.id,
+        role: 'assistant',
+        content: cleanResponse,
+        type: 'text',
+        created_at: new Date().toISOString()
+      };
+      
+      // Salva resposta da IA no banco
+      await supabase.from('chat_messages').insert(assistantMessage);
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error(error);
+      toast.error("Tive um probleminha aqui. Tenta de novo?");
+    } finally {
+      setStatus(null);
+    }
   };
 
   const handleAudio = async () => {
@@ -147,30 +160,43 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
       <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:invert" />
 
       {/* Header WhatsApp Style */}
-      <div className="bg-[#075E54] dark:bg-slate-900 p-4 flex items-center gap-3 z-10 shadow-md">
-        <div className="relative">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-            <Bot className="text-white h-6 w-6" />
+      <div className="bg-[#075E54] dark:bg-slate-900 p-4 flex items-center justify-between z-10 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+              <Bot className="text-white h-6 w-6" />
+            </div>
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#075E54] dark:border-slate-900 rounded-full" />
           </div>
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#075E54] dark:border-slate-900 rounded-full" />
+          <div>
+            <h3 className="text-white font-black text-xs uppercase italic tracking-widest">IA LotoExpert</h3>
+            <p className="text-[9px] text-emerald-100/70 font-bold uppercase tracking-tighter">
+              {status === "lendo" && "Lendo sua mensagem..."}
+              {status === "analisando" && "Analisando dados..."}
+              {status === "digitando" && "Escrevendo resposta..."}
+              {!status && "Online agora"}
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-white font-black text-xs uppercase italic tracking-widest">IA LotoExpert</h3>
-          <p className="text-[9px] text-emerald-100/70 font-bold uppercase tracking-tighter">
-            {status === "lendo" && "Lendo sua mensagem..."}
-            {status === "analisando" && "Analisando dados..."}
-            {status === "digitando" && "Escrevendo resposta..."}
-            {!status && "Online agora"}
-          </p>
-        </div>
+
+        <button 
+          onClick={handleClearChat}
+          className="p-2 text-white/50 hover:text-rose-400 transition-colors"
+          title="Limpar Conversa"
+        >
+          <Trash2 className="h-5 w-5" />
+        </button>
       </div>
 
-      {/* Chat Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 z-10 scrollbar-hide">
+      {/* Chat Area - Scrollable */}
+      <div 
+        ref={scrollRef} 
+        className="flex-1 overflow-y-auto p-4 space-y-6 z-10 scrollbar-hide scroll-smooth"
+      >
         {messages.length === 0 && (
           <div className="flex justify-center my-10">
             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-6 py-3 rounded-2xl text-[10px] font-bold uppercase text-center border border-amber-200 dark:border-amber-800/50 shadow-sm max-w-[80%]">
-              Privacidade Ativa: Suas conversas são privadas e baseadas na sua chave Gemini.
+              Suas conversas são privadas e ficam salvas para sua consulta.
             </div>
           </div>
         )}
@@ -183,7 +209,6 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
               msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start"
             )}
           >
-            {/* Nome do Remetente */}
             <span className={cn(
               "text-[9px] font-black uppercase italic mb-1 px-2 tracking-widest",
               msg.role === 'user' ? "text-slate-500 text-right" : "text-indigo-600 dark:text-indigo-400"
