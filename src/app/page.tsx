@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
