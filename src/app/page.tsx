@@ -5,9 +5,9 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy, Loader2, ArrowRightCircle } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
   if (!freqs) return [];
@@ -59,6 +59,11 @@ export default function Dashboard() {
   };
 
   const getPrizeByHits = (hits: number) => {
+    // Fallback para prêmios fixos da Lotofácil conforme solicitado
+    if (hits === 11) return formatCurrency(7);
+    if (hits === 12) return formatCurrency(12);
+    if (hits === 13) return formatCurrency(35);
+
     const premiacao = stats?.ultimoConcurso?.premiacao_json;
     if (!premiacao || !Array.isArray(premiacao)) return "R$ ---";
     

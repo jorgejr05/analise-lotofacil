@@ -125,21 +125,29 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     repetidas_anterior = dezenas.filter((n: number) => anterior.dezenas.includes(n)).length;
   }
 
-  // A API pode retornar 'premiacoes' ou 'listaRateio'
   let rawPremiacoes = data.premiacoes || data.listaRateio || [];
+  const prizesMap: Record<number, { valor: number, ganhadores: number }> = {};
   
-  const premiacao_json = rawPremiacoes.map((p: any) => {
-    // Tenta capturar o valor de várias propriedades possíveis
-    const valor = p.valorPremio || p.valor || p.valor_estimado || 0;
-    const ganhadores = p.ganhadores || p.numero_ganhadores || p.quantidade_ganhadores || 0;
-    
-    return {
-      faixa: p.faixa,
-      descricao: p.descricao,
-      valor: Number(valor),
-      ganhadores: Number(ganhadores)
+  rawPremiacoes.forEach((p: any) => {
+    const hitsMatch = p.descricao?.match(/(\d+) acertos/);
+    const numHits = hitsMatch ? parseInt(hitsMatch[1]) : (16 - p.faixa);
+    prizesMap[numHits] = {
+      valor: Number(p.valorPremio || p.valor || 0),
+      ganhadores: Number(p.ganhadores || p.numero_ganhadores || 0)
     };
   });
+
+  // Injeção de valores fixos conforme solicitado
+  if (!prizesMap[11] || prizesMap[11].valor <= 0) prizesMap[11] = { valor: 7, ganhadores: prizesMap[11]?.ganhadores || 0 };
+  if (!prizesMap[12] || prizesMap[12].valor <= 0) prizesMap[12] = { valor: 12, ganhadores: prizesMap[12]?.ganhadores || 0 };
+  if (!prizesMap[13] || prizesMap[13].valor <= 0) prizesMap[13] = { valor: 35, ganhadores: prizesMap[13]?.ganhadores || 0 };
+
+  const premiacao_json = [15, 14, 13, 12, 11].map(hits => ({
+    faixa: 16 - hits,
+    descricao: `${hits} acertos`,
+    valor: prizesMap[hits]?.valor || 0,
+    ganhadores: prizesMap[hits]?.ganhadores || 0
+  }));
 
   return {
     concurso: Number(data.concurso),
@@ -159,7 +167,6 @@ export const syncLatestResults = async () => {
     const latestApi = await fetchLatestConcurso();
     const latestNum = Number(latestApi.concurso);
 
-    // Buscamos o último salvo para saber de onde começar
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -167,15 +174,12 @@ export const syncLatestResults = async () => {
       .limit(1)
       .maybeSingle();
 
-    // Começamos do último salvo ou de 10 concursos atrás para garantir preenchimento de rateio
     const startFrom = lastSaved ? Math.max(1, lastSaved.concurso - 5) : Math.max(1, latestNum - 20);
 
     let count = 0;
-    // Sincronizamos os últimos 10 concursos para garantir que prêmios que chegaram depois sejam salvos
     for (let i = startFrom; i <= latestNum; i++) {
       try {
         const data = await fetchConcursoByNumber(i);
-        
         const { data: anterior } = await supabase
           .from('concursos')
           .select('*')
@@ -183,8 +187,6 @@ export const syncLatestResults = async () => {
           .maybeSingle();
 
         const processed = processConcursoData(data, anterior || undefined);
-        
-        // Só faz o upsert se tivermos dezenas (evita salvar lixo se a API falhar)
         if (processed.dezenas.length === 15) {
           await supabase.from('concursos').upsert(processed, { onConflict: 'concurso' });
           count++;
@@ -195,12 +197,7 @@ export const syncLatestResults = async () => {
     }
 
     await updateAllGamesPoints();
-
-    return { 
-      message: count > 0 
-        ? `Sincronizados ${count} concursos com sucesso!` 
-        : 'Sincronização concluída (sem novos dados).' 
-    };
+    return { message: count > 0 ? `Sincronizados ${count} concursos!` : 'Sincronização concluída.' };
   } catch (error) {
     console.error('Erro na sincronização global:', error);
     throw error;
