@@ -95,7 +95,7 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
   if (!apiKey) return "Erro na transcrição: Chave não configurada.";
   
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
   
   try {
     const result = await model.generateContent([
