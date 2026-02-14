@@ -107,9 +107,6 @@ export const Navigation = () => {
               </Link>
             );
           })}
-          <button onClick={() => signOut()} className="p-3 text-slate-400">
-            <LogOut className="h-5 w-5" />
-          </button>
         </nav>
       </div>
     </>

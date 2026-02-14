@@ -18,7 +18,8 @@ import {
   KeyRound,
   BrainCircuit,
   Eye,
-  EyeOff
+  EyeOff,
+  LogOut
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,7 +27,7 @@ import { useAuth } from "@/components/auth-provider";
 import { updateProfileSafe } from "@/lib/profile-actions";
 
 export default function ProfilePage() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -150,6 +151,17 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Botão Sair visível apenas em Mobile para limpar a barra inferior */}
+            <div className="md:hidden">
+              <Button 
+                onClick={() => signOut()} 
+                variant="outline" 
+                className="w-full h-14 border-2 border-rose-100 text-rose-600 rounded-2xl font-black uppercase italic tracking-widest text-xs hover:bg-rose-50"
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Sair da Conta
+              </Button>
+            </div>
           </div>
 
           <div className="lg:col-span-2 space-y-6">
