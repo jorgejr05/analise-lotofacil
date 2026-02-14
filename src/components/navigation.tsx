@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List } from "lucide-react";
+import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Beaker } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 
@@ -18,11 +18,11 @@ export const Navigation = () => {
     { name: "Estatísticas", href: "/statistics", icon: LineChart },
     { name: "Resultados", href: "/results", icon: List },
     { name: "Meus Jogos", href: "/my-games", icon: History },
+    { name: "Laboratório", href: "/lab", icon: Beaker },
   ];
 
   return (
     <>
-      {/* Sidebar Desktop */}
       <nav className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r p-6 z-50">
         <div className="mb-10 px-2">
           <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-2 tracking-tighter">
@@ -67,9 +67,8 @@ export const Navigation = () => {
         </div>
       </nav>
 
-      {/* Navegação Flutuante Mobile */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50">
-        <nav className="bg-white/80 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] rounded-[2.5rem] p-2 flex justify-around items-center">
+        <nav className="bg-white/80 backdrop-blur-xl border border-white/40 shadow-lg rounded-[2.5rem] p-2 flex justify-around items-center">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -89,11 +88,7 @@ export const Navigation = () => {
               </Link>
             );
           })}
-          
-          <button
-            onClick={() => signOut()}
-            className="flex items-center justify-center p-3 text-slate-400 active:text-rose-500 transition-colors"
-          >
+          <button onClick={() => signOut()} className="p-3 text-slate-400">
             <LogOut className="h-5 w-5" />
           </button>
         </nav>

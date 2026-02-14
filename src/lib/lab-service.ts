@@ -15,6 +15,7 @@ export const runBacktestBatch = async (config: BacktestConfig, backtestId: strin
   const { startConcurso, endConcurso, gamesPerContest, model } = config;
   
   for (let c = startConcurso; c <= endConcurso; c++) {
+    // 1. Busca histórico cego (apenas o que existia antes do concurso testado)
     const { data: pastConcursos } = await supabase
       .from('concursos')
       .select('*')
@@ -24,6 +25,7 @@ export const runBacktestBatch = async (config: BacktestConfig, backtestId: strin
 
     if (!pastConcursos || pastConcursos.length < 200) continue;
 
+    // 2. Busca o resultado real para conferência
     const { data: realResult } = await supabase
       .from('concursos')
       .select('dezenas')
@@ -35,6 +37,7 @@ export const runBacktestBatch = async (config: BacktestConfig, backtestId: strin
     let generatedGames: number[][] = [];
     
     if (model === 'random') {
+      // Geração aleatória para baseline
       for (let i = 0; i < gamesPerContest; i++) {
         const game: number[] = [];
         while (game.length < 15) {
@@ -44,6 +47,7 @@ export const runBacktestBatch = async (config: BacktestConfig, backtestId: strin
         generatedGames.push(game.sort((a, b) => a - b));
       }
     } else {
+      // Usa o modelo adaptativo (Windowed Probability)
       const stats = calculateWindowedStats(pastConcursos);
       generatedGames = generateProbabilisticGames(stats as any, gamesPerContest);
     }
@@ -52,6 +56,7 @@ export const runBacktestBatch = async (config: BacktestConfig, backtestId: strin
       game.filter(num => realResult.dezenas.includes(num)).length
     );
 
+    // 3. Salva progresso incremental
     await supabase.from('backtest_results').insert({
       backtest_id: backtestId,
       concurso_testado: c,
