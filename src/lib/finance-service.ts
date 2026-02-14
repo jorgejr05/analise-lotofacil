@@ -3,15 +3,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const getBankrollStats = async (userId: string) => {
-  // Garantir que o usuário tenha configurações de banca
-  const { data: settings } = await supabase
+  // Ensure user has bankroll settings
+  let { data: settings } = await supabase
     .from('user_bankroll_settings')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (!settings) {
-    await supabase.from('user_bankroll_settings').insert({ user_id: userId });
+    const { data: newSettings } = await supabase
+      .from('user_bankroll_settings')
+      .insert({ user_id: userId, bankroll_inicial: 1000, bankroll_atual: 1000 })
+      .select()
+      .single();
+    settings = newSettings;
   }
 
   const { data: history } = await supabase
@@ -28,7 +33,8 @@ export const getBankrollStats = async (userId: string) => {
       maxDrawdown: 0,
       totalConcursos: 0,
       history: [],
-      currentBankroll: settings?.bankroll_atual || 1000
+      currentBankroll: Number(settings?.bankroll_atual || 1000),
+      initialBankroll: Number(settings?.bankroll_inicial || 1000)
     };
   }
 
@@ -36,7 +42,7 @@ export const getBankrollStats = async (userId: string) => {
   const totalPremiado = history.reduce((acc, curr) => acc + Number(curr.valor_premiado), 0);
   const roiGeral = totalApostado > 0 ? ((totalPremiado - totalApostado) / totalApostado) * 100 : 0;
 
-  // Cálculo de Drawdown Máximo
+  // Max Drawdown Calculation
   let peak = Number(settings?.bankroll_inicial || 1000);
   let current = peak;
   let maxDD = 0;
@@ -55,8 +61,30 @@ export const getBankrollStats = async (userId: string) => {
     maxDrawdown: maxDD,
     totalConcursos: history.length,
     history,
-    currentBankroll: settings?.bankroll_atual || 1000
+    currentBankroll: Number(settings?.bankroll_atual || 1000),
+    initialBankroll: Number(settings?.bankroll_inicial || 1000)
   };
+};
+
+export const updateBankrollSettings = async (userId: string, initialAmount: number) => {
+  const { data: history } = await supabase
+    .from('bankroll_history')
+    .select('lucro_prejuizo')
+    .eq('user_id', userId);
+  
+  const totalProfitLoss = history?.reduce((acc, curr) => acc + Number(curr.lucro_prejuizo), 0) || 0;
+  const newCurrentBalance = initialAmount + totalProfitLoss;
+
+  const { error } = await supabase
+    .from('user_bankroll_settings')
+    .update({ 
+      bankroll_inicial: initialAmount,
+      bankroll_atual: newCurrentBalance,
+      updated_at: new Date().toISOString()
+    })
+    .eq('user_id', userId);
+
+  return { error };
 };
 
 export const registerBet = async (userId: string, concursoId: number, valorApostado: number, isSimulado: boolean = true) => {
@@ -66,18 +94,19 @@ export const registerBet = async (userId: string, concursoId: number, valorApost
     .eq('user_id', userId)
     .single();
 
-  const bankrollAntes = settings?.bankroll_atual || 1000;
+  const bankrollAntes = Number(settings?.bankroll_atual || 1000);
 
   const { error } = await supabase.from('bankroll_history').insert({
     user_id: userId,
     concurso_id: concursoId,
     valor_apostado: valorApostado,
-    valor_premiado: 0, // Começa com zero até o resultado sair
+    valor_premiado: 0,
     bankroll_snapshot: bankrollAntes,
     is_simulado: isSimulado
   });
 
-  if (!error && !isSimulado) {
+  // Always update current bankroll for real or simulated if you want it tracked
+  if (!error) {
     await supabase
       .from('user_bankroll_settings')
       .update({ bankroll_atual: bankrollAntes - valorApostado })
