@@ -9,7 +9,6 @@ import {
   Trophy, 
   Calendar, 
   Sparkles, 
-  Search,
   CheckCircle2,
   Wallet
 } from "lucide-react";
@@ -201,3 +200,4 @@ export default function MyGamesPage() {
       </div>
     </div>
   );
+}
