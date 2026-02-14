@@ -13,7 +13,7 @@ export const useAudioRecorder = () => {
       mediaRecorder.current = new MediaRecorder(stream);
       chunks.current = [];
 
-      mediaRecorder.current.ondataavailable = (e) => {
+      mediaRecorder.current.ondataavailable = (e: BlobEvent) => {
         if (e.data.size > 0) chunks.current.push(e.data);
       };
 
@@ -37,8 +37,7 @@ export const useAudioRecorder = () => {
           resolve(base64);
         };
         setIsRecording(false);
-        // Parar todos os tracks do stream
-        mediaRecorder.current?.stream.getTracks().forEach(track => track.stop());
+        mediaRecorder.current?.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       };
 
       mediaRecorder.current.stop();

@@ -8,7 +8,6 @@ export const useLotofacilStats = () => {
   const calculateStats = async () => {
     setLoading(true);
     try {
-      // Buscamos um lote maior para ter dados de todas as janelas
       const { data: concursos } = await supabase
         .from('concursos')
         .select('*')
@@ -21,7 +20,6 @@ export const useLotofacilStats = () => {
         const freq: Record<number, number> = {};
         for (let i = 1; i <= 25; i++) freq[i] = 0;
         list.forEach(c => c.dezenas.forEach((d: number) => freq[d]++));
-        // Normalizar para porcentagem baseada no tamanho da lista
         Object.keys(freq).forEach(k => freq[Number(k)] = (freq[Number(k)] / list.length) * 100);
         return freq;
       };
@@ -32,16 +30,16 @@ export const useLotofacilStats = () => {
 
       const atraso: Record<number, number> = {};
       for (let i = 1; i <= 25; i++) {
-        const lastIndex = concursos.findIndex(c => c.dezenas.includes(i));
+        const lastIndex = concursos.findIndex((c: any) => c.dezenas.includes(i));
         atraso[i] = lastIndex === -1 ? 100 : lastIndex;
       }
 
-      const somaMedia = concursos.slice(0, 100).reduce((acc, c) => acc + c.soma, 0) / 100;
-      const paresMedia = concursos.slice(0, 100).reduce((acc, c) => acc + c.pares, 0) / 100;
+      const somaMedia = concursos.slice(0, 100).reduce((acc: number, c: any) => acc + c.soma, 0) / 100;
+      const paresMedia = concursos.slice(0, 100).reduce((acc: number, c: any) => acc + c.pares, 0) / 100;
       
-      const concursosComRepetidas = concursos.filter(c => c.repetidas_anterior !== null);
+      const concursosComRepetidas = concursos.filter((c: any) => c.repetidas_anterior !== null);
       const repetidasMedia = concursosComRepetidas.length > 0
-        ? concursosComRepetidas.slice(0, 100).reduce((acc, c) => acc + (c.repetidas_anterior || 0), 0) / 100
+        ? concursosComRepetidas.slice(0, 100).reduce((acc: number, c: any) => acc + (c.repetidas_anterior || 0), 0) / 100
         : 9;
 
       setStats({
