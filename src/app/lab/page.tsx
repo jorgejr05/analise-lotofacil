@@ -82,7 +82,8 @@ export default function LabPage() {
 
       if (error) throw error;
 
-      toast.info(`Iniciando backtest ${model} (${count} concursos)...`);
+      const modelLabel = model === 'gemini' ? 'IA' : 'Aleatório';
+      toast.info(`Iniciando backtest ${modelLabel} (${count} concursos)...`);
       await runBacktestBatch({
         userId: user.id,
         startConcurso: start,
@@ -107,9 +108,9 @@ export default function LabPage() {
     if (!gemini || !random) return null;
 
     return [
-      { name: '11 Pts', Gemini: gemini.resultado_json.p11.toFixed(2), Baseline: random.resultado_json.p11.toFixed(2) },
-      { name: '12 Pts', Gemini: gemini.resultado_json.p12.toFixed(2), Baseline: random.resultado_json.p12.toFixed(2) },
-      { name: '13 Pts', Gemini: gemini.resultado_json.p13.toFixed(2), Baseline: random.resultado_json.p13.toFixed(2) },
+      { name: '11 Pts', Gemini: gemini.resultado_json.p11.toFixed(2), Aleatório: random.resultado_json.p11.toFixed(2) },
+      { name: '12 Pts', Gemini: gemini.resultado_json.p12.toFixed(2), Aleatório: random.resultado_json.p12.toFixed(2) },
+      { name: '13 Pts', Gemini: gemini.resultado_json.p13.toFixed(2), Aleatório: random.resultado_json.p13.toFixed(2) },
     ];
   };
 
@@ -167,7 +168,7 @@ export default function LabPage() {
                     variant="outline" 
                     className="w-full border-2 border-slate-100 h-14 font-black uppercase italic tracking-wider text-xs rounded-xl text-slate-600"
                   >
-                    Testar Baseline (Random)
+                    Testar Motor Aleatório
                   </Button>
                 </div>
               </CardContent>
@@ -201,15 +202,15 @@ export default function LabPage() {
                         contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }} 
                       />
                       <Legend verticalAlign="top" align="right" />
-                      <Bar dataKey="Gemini" fill="#4f46e5" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="Baseline" fill="#94a3b8" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Gemini" fill="#4f46e5" radius={[6, 6, 0, 0]} name="Inteligência IA" />
+                      <Bar dataKey="Aleatório" fill="#94a3b8" radius={[6, 6, 0, 0]} name="Aposta Aleatória" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
                     <TrendingUp className="h-12 w-12 opacity-20" />
                     <p className="text-[10px] font-black uppercase italic text-center px-10">
-                      Rode os testes IA e Baseline para visualizar a comparação de eficácia estatística.
+                      Rode os testes IA e Aleatório para visualizar a comparação de eficácia estatística.
                     </p>
                   </div>
                 )}
@@ -232,7 +233,7 @@ export default function LabPage() {
                       {bt.status === 'processando' ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
                     </div>
                     <div>
-                      <div className="text-xs font-black uppercase tracking-tighter">Motor {bt.modelo_usado === 'gemini' ? 'IA' : 'Random'}</div>
+                      <div className="text-xs font-black uppercase tracking-tighter">Motor {bt.modelo_usado === 'gemini' ? 'IA' : 'Aleatório'}</div>
                       <div className="text-[9px] font-bold text-slate-400 uppercase">{bt.quantidade_concursos} Concursos • {new Date(bt.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
