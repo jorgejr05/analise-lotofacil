@@ -182,7 +182,7 @@ export default function Dashboard() {
                           {item.num.toString().padStart(2, '0')}
                         </div>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">
-                          {item.freq}%
+                          {item.freq.toFixed(1).replace(/\.0$/, '')}%
                         </span>
                       </div>
                     ))}
@@ -210,7 +210,7 @@ export default function Dashboard() {
                           {item.num.toString().padStart(2, '0')}
                         </div>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">
-                          {item.freq}%
+                          {item.freq.toFixed(1).replace(/\.0$/, '')}%
                         </span>
                       </div>
                     ))}
@@ -226,7 +226,7 @@ export default function Dashboard() {
                 <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
                   <Trophy className="h-4 w-4" /> Tabela de Prêmios
                 </CardTitle>
-              </CardHeader>
+              </Header>
               <CardContent className="p-6 space-y-4">
                 {[15, 14, 13, 12, 11].map((pts) => (
                   <div key={pts} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:bg-indigo-50 transition-colors">
