@@ -27,25 +27,12 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Sincronização automática silenciosa apenas no primeiro carregamento
-  useEffect(() => {
-    const autoSync = async () => {
-      try {
-        await syncLatestResults();
-        refresh();
-      } catch (e) {
-        console.error("Sincronização automática falhou", e);
-      }
-    };
-    autoSync();
-  }, []); // Executa apenas uma vez ao montar
-
   const handleSync = async () => {
     setSyncing(true);
     try {
       const res = await syncLatestResults();
       toast.success(res.message);
-      refresh();
+      // Não precisamos chamar refresh() manualmente, o Realtime vai detectar a mudança no banco!
     } catch (error) {
       toast.error("Erro ao sincronizar dados.");
     } finally {
@@ -53,7 +40,6 @@ export default function Dashboard() {
     }
   };
 
-  // Só mostra o loader de tela cheia se não houver NENHUM dado ainda
   if (loading && !stats) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white">
