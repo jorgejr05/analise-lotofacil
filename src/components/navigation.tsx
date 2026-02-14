@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Beaker } from "lucide-react";
+import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Beaker, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 
@@ -19,6 +19,7 @@ export const Navigation = () => {
     { name: "Resultados", href: "/results", icon: List },
     { name: "Meus Jogos", href: "/my-games", icon: History },
     { name: "Laboratório", href: "/lab", icon: Beaker },
+    { name: "Perfil", href: "/profile", icon: UserCircle },
   ];
 
   return (
