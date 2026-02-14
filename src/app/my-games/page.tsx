@@ -10,7 +10,8 @@ import {
   Calendar, 
   Sparkles, 
   Search,
-  CheckCircle2
+  CheckCircle2,
+  Wallet
 } from "lucide-react";
 import { 
   Select, 
@@ -21,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { calculatePoints } from "@/lib/lotofacil-service";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function MyGamesPage() {
   const [jogos, setJogos] = useState<any[]>([]);
@@ -37,13 +40,11 @@ export default function MyGamesPage() {
         return;
       }
 
-      // 1. Buscar jogos do usuário
       const { data: gamesData } = await supabase
         .from('jogos')
         .select('*')
         .order('criado_em', { ascending: false });
 
-      // 2. Buscar últimos 20 concursos para comparação
       const { data: contestsData } = await supabase
         .from('concursos')
         .select('concurso, dezenas, data')
@@ -79,25 +80,40 @@ export default function MyGamesPage() {
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-1">
             <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Registro de Atividade</span>
-            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
-              Meus <span className="text-indigo-600">Jogos</span>
-            </h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+                Meus <span className="text-indigo-600">Jogos</span>
+              </h1>
+              <Link href="/bankroll" className="md:hidden">
+                <Button size="icon" variant="outline" className="rounded-full h-10 w-10 border-indigo-100 bg-white text-indigo-600 shadow-sm">
+                  <Wallet className="h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
           </div>
 
-          <div className="w-full md:w-72 space-y-2">
-            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Conferir com Resultado:</label>
-            <Select value={selectedConcurso} onValueChange={setSelectedConcurso}>
-              <SelectTrigger className="h-12 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 shadow-sm">
-                <SelectValue placeholder="Selecione o concurso" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-slate-100 shadow-2xl">
-                {concursos.map((c) => (
-                  <SelectItem key={c.concurso} value={c.concurso.toString()} className="font-bold py-3">
-                    Concurso {c.concurso} ({new Date(c.data).toLocaleDateString('pt-BR')})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col md:flex-row items-stretch md:items-end gap-4 w-full md:w-auto">
+            <div className="w-full md:w-72 space-y-2">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Conferir com Resultado:</label>
+              <Select value={selectedConcurso} onValueChange={setSelectedConcurso}>
+                <SelectTrigger className="h-12 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 shadow-sm">
+                  <SelectValue placeholder="Selecione o concurso" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-100 shadow-2xl">
+                  {concursos.map((c) => (
+                    <SelectItem key={c.concurso} value={c.concurso.toString()} className="font-bold py-3">
+                      Concurso {c.concurso} ({new Date(c.data).toLocaleDateString('pt-BR')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Link href="/bankroll" className="hidden md:block">
+              <Button className="h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black uppercase italic tracking-widest text-[10px] px-6 shadow-lg shadow-slate-200">
+                <Wallet className="h-4 w-4 mr-2" /> Minha Banca
+              </Button>
+            </Link>
           </div>
         </header>
 
@@ -128,7 +144,6 @@ export default function MyGamesPage() {
                   )}
                 >
                   <div className="flex flex-col md:flex-row">
-                    {/* Status Sidebar */}
                     <div className={cn(
                       "w-full md:w-28 p-6 flex md:flex-col items-center justify-center gap-4 text-white transition-colors duration-500",
                       isWinner ? "bg-emerald-500" : "bg-slate-900"
@@ -140,7 +155,6 @@ export default function MyGamesPage() {
                       {isWinner && <Trophy className="h-6 w-6 animate-bounce" />}
                     </div>
 
-                    {/* Content */}
                     <CardContent className="flex-1 p-8 space-y-6">
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">

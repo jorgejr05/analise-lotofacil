@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Beaker, UserCircle, Wallet } from "lucide-react";
+import { LayoutDashboard, Dices, History, BarChart3, LogOut, LineChart, List, Beaker, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,7 +18,6 @@ export const Navigation = () => {
     { name: "Gerador", href: "/generator", icon: Dices },
     { name: "Estatísticas", href: "/statistics", icon: LineChart },
     { name: "Resultados", href: "/results", icon: List },
-    { name: "Banca", href: "/bankroll", icon: Wallet },
     { name: "Meus Jogos", href: "/my-games", icon: History },
     { name: "Laboratório", href: "/lab", icon: Beaker },
     { name: "Perfil", href: "/profile", icon: UserCircle },

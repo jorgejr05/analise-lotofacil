@@ -180,13 +180,13 @@ export default function BankrollPage() {
           <Card className="border-none shadow-lg rounded-[2rem] bg-white p-6 flex flex-col justify-between h-40">
             <div className="flex justify-between items-start">
               <TrendingDown className="h-6 w-6 text-rose-400" />
-              <div className="bg-rose-50 px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest text-rose-600">Max Drawdown</div>
+              <div className="bg-rose-50 px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest text-rose-600">Queda Máxima</div>
             </div>
             <div>
               <div className="text-xl md:text-2xl font-black tracking-tighter text-rose-600 truncate">
                 {stats.maxDrawdown.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pior Queda</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pior Oscilação</p>
             </div>
           </Card>
         </div>
