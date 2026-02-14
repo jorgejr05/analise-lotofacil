@@ -16,7 +16,7 @@ interface ChatInterfaceProps {
   onGenerateRequest?: (quantity: number) => void;
 }
 
-type ChatStatus = "lendo" | "analisando" | "digitando" | null;
+type ChatStatus = "lendo" | "analisando" | "digitando" | "transcrevendo" | null;
 
 export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) => {
   const { user, profile } = useAuth();
@@ -95,14 +95,25 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   };
 
   const handleAudio = async () => {
-    if (!user) return;
+    if (!user || status) return;
+    
     if (isRecording) {
+      setStatus("transcrevendo");
       const base64 = await stopRecording();
       if (base64) {
         const trans = await transcribeAudio(base64, user.id);
-        if (trans && trans !== "Não entendi o áudio.") sendMessage(trans, 'audio');
+        if (trans.trim()) {
+          sendMessage(trans, 'audio');
+        } else {
+          toast.info("Não consegui entender o áudio. Tente falar mais claro.");
+          setStatus(null);
+        }
+      } else {
+        setStatus(null);
       }
-    } else startRecording();
+    } else {
+      startRecording();
+    }
   };
 
   return (
@@ -155,11 +166,19 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
             </div>
           </div>
         ))}
+        {status === "transcrevendo" && (
+          <div className="flex flex-col mr-auto items-start max-w-[90%]">
+            <span className="text-[9px] font-black uppercase italic mb-1 px-2 tracking-widest text-indigo-600 dark:text-indigo-400">IA LotoExpert</span>
+            <div className="p-4 rounded-2xl text-xs font-medium shadow-sm bg-white dark:bg-slate-800 text-slate-400 italic flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo áudio...
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input */}
       <div className="p-3 bg-[#F0F0F0] dark:bg-slate-900 flex items-center gap-2 z-10 border-t dark:border-slate-800">
-        <div className="flex-1 flex items-center bg-white dark:bg-slate-800 rounded-full px-4 py-1 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="flex-1 flex items-center bg-white dark:bg-slate-900 rounded-full px-4 py-1 shadow-sm border border-slate-200 dark:border-slate-700">
           <Input 
             value={input} 
             onChange={(e) => setInput(e.target.value)} 
@@ -168,11 +187,15 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
             disabled={isRecording || !!status}
             className="border-none bg-transparent focus-visible:ring-0 h-10 text-sm" 
           />
-          <button onClick={handleAudio} className={cn("p-2", isRecording ? "text-rose-500 animate-pulse" : "text-slate-400")}>
+          <button 
+            onClick={handleAudio} 
+            disabled={!!status && status !== "transcrevendo"}
+            className={cn("p-2 transition-colors", isRecording ? "text-rose-500 animate-pulse" : "text-slate-400 hover:text-indigo-600")}
+          >
             {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </button>
         </div>
-        <Button onClick={() => sendMessage(input)} disabled={!input.trim() || !!status} className="rounded-full h-12 w-12 bg-[#128C7E] p-0">
+        <Button onClick={() => sendMessage(input)} disabled={!input.trim() || !!status} className="rounded-full h-12 w-12 bg-[#128C7E] p-0 hover:bg-[#075E54] transition-colors">
           <Send className="h-5 w-5 text-white" />
         </Button>
       </div>

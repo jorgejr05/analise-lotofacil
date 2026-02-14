@@ -50,7 +50,7 @@ export const processChatInteraction = async (
     const result = await chat.sendMessage(lastMessage);
     return result.response.text();
   } catch (error) {
-    console.error("[Chat Error]", error);
+    console.error("[processChatInteraction] Erro no Gemini:", error);
     return "Tive um erro aqui. Dá uma olhada na sua chave API lá no perfil!";
   }
 };
@@ -67,12 +67,16 @@ export const transcribeAudio = async (base64Audio: string, userId?: string) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     
+    console.log("[transcribeAudio] Enviando áudio para transcrição...");
     const result = await model.generateContent([
-      "Transcreva este áudio de forma resumida.",
+      "Transcreva exatamente o que foi dito neste áudio sobre a Lotofácil. Se não houver fala clara, responda: ERRO_TRANSCRICAO",
       { inlineData: { mimeType: "audio/webm", data: base64Audio } }
     ]);
-    return result.response.text();
+    
+    const text = result.response.text();
+    return text.includes("ERRO_TRANSCRICAO") ? "" : text;
   } catch (error) {
-    return "Não entendi o áudio.";
+    console.error("[transcribeAudio] Erro na transcrição:", error);
+    return "";
   }
 };
