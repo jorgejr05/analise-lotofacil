@@ -5,7 +5,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export const processChatInteraction = async (
   messages: { role: string; content: string }[],
   stats: any,
-  userGames: any[] = []
+  userGames: any[] = [],
+  backtestResults: any[] = []
 ) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return "IA indisponível: Chave API não configurada.";
@@ -19,30 +20,36 @@ export const processChatInteraction = async (
       ).join('\n')
     : "Nenhum jogo salvo.";
 
+  const labSummary = backtestResults.length > 0
+    ? backtestResults.slice(0, 3).map(b => 
+        `- Motor: ${b.modelo_usado} | Concursos: ${b.quantidade_concursos} | Status: ${b.status} | Eficácia (Média): ${b.resultado_json?.media?.toFixed(2) || 'N/A'}`
+      ).join('\n')
+    : "Nenhum teste de laboratório realizado ainda.";
+
   const systemPrompt = `
     Você é o LotoExpert AI, um consultor humano e estrategista de elite da Lotofácil.
     
     REGRAS CRÍTICAS:
-    1. FOCO TOTAL: Você só fala sobre Lotofácil, estatísticas e estratégias.
-    2. SEM LIMITES DE GERAÇÃO: Se o usuário pedir 20, 50 ou 100 jogos, você deve atender. Não há limite máximo.
-    3. ESTRATÉGIAS MÚLTIPLAS: Se o usuário pedir, por exemplo, "10 jogos quentes e 10 jogos frios", você pode emitir múltiplos comandos ou um comando somado.
-    4. COMANDO DE GERAÇÃO: Para disparar a geração na tela, use o código: [GENERATE:X] onde X é o número total de jogos solicitados.
-    5. HUMANIZAÇÃO E ANÁLISE: Antes de gerar, explique sua linha de raciocínio estatístico. Seja um consultor de alto nível.
-    6. DESVIO DE ASSUNTO: Recuse educadamente qualquer tema fora de loteria.
+    1. CONHECIMENTO CIENTÍFICO: Você tem acesso aos resultados do LABORATÓRIO (Backtests). Use isso para validar suas sugestões.
+    2. FOCO TOTAL: Você só fala sobre Lotofácil, estatísticas e estratégias.
+    3. COMANDO DE GERAÇÃO: Para disparar a geração na tela, use o código: [GENERATE:X] onde X é o número de jogos.
+    4. HUMANIZAÇÃO: Seja um consultor de alto nível, use os dados para provar por que sua estratégia é boa.
     
-    Dados Reais:
-    - Último Concurso: ${stats.ultimoConcurso.concurso}
-    - Dezenas: ${stats.ultimoConcurso.dezenas.join(', ')}
-    - Soma Média: ${Math.round(stats.somaMedia)}
-    
-    Histórico do Usuário:
+    Dados de Desempenho Real (Laboratório):
+    ${labSummary}
+
+    Histórico de Jogos do Usuário:
     ${gamesSummary}
+
+    Dados Estatísticos Atuais:
+    - Último Concurso: ${stats.ultimoConcurso.concurso}
+    - Soma Média: ${Math.round(stats.somaMedia)}
   `;
 
   const chat = model.startChat({
     history: [
       { role: "user", parts: [{ text: systemPrompt }] },
-      { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Não tenho limites de geração e estou pronto para criar estratégias complexas e múltiplos jogos conforme sua necessidade. Como vamos atacar o próximo concurso?" }] },
+      { role: "model", parts: [{ text: "Entendido. Sou o LotoExpert AI. Analisei os resultados do nosso laboratório e os seus jogos anteriores. Estou pronto para criar uma estratégia baseada em evidências. Como posso ajudar?" }] },
     ],
   });
 

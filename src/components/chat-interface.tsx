@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
 export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [userGames, setUserGames] = useState<any[]>([]);
+  const [backtests, setBacktests] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
@@ -24,13 +25,20 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   const batchTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const fetchUserGames = async () => {
+    const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from('jogos').select('*').order('criado_em', { ascending: false }).limit(20);
-      if (data) setUserGames(data);
+
+      // Buscar jogos e backtests para o contexto da IA
+      const [gamesRes, backtestsRes] = await Promise.all([
+        supabase.from('jogos').select('*').order('criado_em', { ascending: false }).limit(20),
+        supabase.from('backtests').select('*').order('created_at', { ascending: false }).limit(5)
+      ]);
+
+      if (gamesRes.data) setUserGames(gamesRes.data);
+      if (backtestsRes.data) setBacktests(backtestsRes.data);
     };
-    fetchUserGames();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -51,9 +59,8 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     batchTimer.current = setTimeout(async () => {
       setIsTyping(true);
       try {
-        const response = await processChatInteraction([...messages, newMessage], stats, userGames);
+        const response = await processChatInteraction([...messages, newMessage], stats, userGames, backtests);
         
-        // Detectar comando de geração: [GENERATE:X]
         const genMatch = response.match(/\[GENERATE:(\d+)\]/);
         let cleanResponse = response.replace(/\[GENERATE:\d+\]/g, "").trim();
 
@@ -110,7 +117,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         {messages.length === 0 && (
           <div className="text-center py-10 space-y-2">
             <p className="text-slate-400 text-[10px] font-black uppercase italic">Consultoria Estratégica</p>
-            <p className="text-slate-300 text-[9px] font-medium px-10">Discuta planos de jogo ou peça para eu gerar apostas diretamente por aqui.</p>
+            <p className="text-slate-300 text-[9px] font-medium px-10">Fale comigo por áudio ou texto. Eu sei tudo o que aconteceu no laboratório e nos seus jogos!</p>
           </div>
         )}
         {messages.map((msg, i) => (
@@ -127,7 +134,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         {isTyping && (
           <div className="flex items-center gap-2 text-indigo-600 animate-pulse">
             <Loader2 className="h-3 w-3 animate-spin" />
-            <span className="text-[9px] font-black uppercase italic">Processando estratégia...</span>
+            <span className="text-[9px] font-black uppercase italic">Analisando dados do laboratório...</span>
           </div>
         )}
       </div>
@@ -136,7 +143,7 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
         <Button variant="ghost" size="icon" onClick={handleAudio} className={cn("rounded-full h-12 w-12 shrink-0 transition-all", isRecording ? "bg-rose-500 text-white animate-pulse" : "bg-slate-50 text-slate-400 hover:text-indigo-600")}>
           {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </Button>
-        <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} placeholder="Ex: Gere 25 jogos com dezenas quentes..." className="h-12 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-medium text-xs" />
+        <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} placeholder="Ex: Baseado no laboratório, qual a melhor estratégia?" className="h-12 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-indigo-600 font-medium text-xs" />
         <Button onClick={() => sendMessage(input)} disabled={!input.trim()} className="rounded-full h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-100 shrink-0">
           <Send className="h-5 w-5" />
         </Button>
