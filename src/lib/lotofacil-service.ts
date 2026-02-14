@@ -49,7 +49,7 @@ export const updateAllGamesPoints = async () => {
         .eq('concurso', targetConcurso)
         .maybeSingle();
 
-      if (concurso) {
+      if (concurso && concurso.dezenas) {
         const pontos = calculatePoints(jogo.dezenas, concurso.dezenas);
         
         await supabase
@@ -115,26 +115,31 @@ const formatDateForDb = (dateStr: string) => {
 };
 
 export const processConcursoData = (data: any, anterior?: Concurso): Concurso => {
-  const dezenas = data.dezenas.map(Number).sort((a: number, b: number) => a - b);
+  const dezenas = data.dezenas?.map(Number).sort((a: number, b: number) => a - b) || [];
   const soma = dezenas.reduce((acc: number, curr: number) => acc + curr, 0);
   const pares = dezenas.filter((n: number) => n % 2 === 0).length;
   const impares = 15 - pares;
   
   let repetidas_anterior = 0;
-  if (anterior) {
+  if (anterior && dezenas.length > 0) {
     repetidas_anterior = dezenas.filter((n: number) => anterior.dezenas.includes(n)).length;
   }
 
-  // A API usa 'premiacoes' com o campo 'valorPremio'
+  // A API pode retornar 'premiacoes' ou 'listaRateio'
   let rawPremiacoes = data.premiacoes || data.listaRateio || [];
   
-  // Normalizamos para um formato padrão interno
-  const premiacao_json = rawPremiacoes.map((p: any) => ({
-    faixa: p.faixa,
-    descricao: p.descricao,
-    valor: p.valorPremio || p.valor || 0,
-    ganhadores: p.ganhadores || p.numero_ganhadores || 0
-  }));
+  const premiacao_json = rawPremiacoes.map((p: any) => {
+    // Tenta capturar o valor de várias propriedades possíveis
+    const valor = p.valorPremio || p.valor || p.valor_estimado || 0;
+    const ganhadores = p.ganhadores || p.numero_ganhadores || p.quantidade_ganhadores || 0;
+    
+    return {
+      faixa: p.faixa,
+      descricao: p.descricao,
+      valor: Number(valor),
+      ganhadores: Number(ganhadores)
+    };
+  });
 
   return {
     concurso: Number(data.concurso),
@@ -145,7 +150,7 @@ export const processConcursoData = (data: any, anterior?: Concurso): Concurso =>
     impares,
     repetidas_anterior,
     premiacao_json,
-    valor_estimado: data.valorEstimadoProximoConcurso || 0
+    valor_estimado: Number(data.valorEstimadoProximoConcurso || 0)
   };
 };
 
@@ -154,6 +159,7 @@ export const syncLatestResults = async () => {
     const latestApi = await fetchLatestConcurso();
     const latestNum = Number(latestApi.concurso);
 
+    // Buscamos o último salvo para saber de onde começar
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -161,32 +167,39 @@ export const syncLatestResults = async () => {
       .limit(1)
       .maybeSingle();
 
-    const startFrom = lastSaved ? lastSaved.concurso + 1 : 1;
-    const syncStart = Math.max(1, startFrom - 1);
+    // Começamos do último salvo ou de 10 concursos atrás para garantir preenchimento de rateio
+    const startFrom = lastSaved ? Math.max(1, lastSaved.concurso - 5) : Math.max(1, latestNum - 20);
 
-    const limit = 5; 
     let count = 0;
+    // Sincronizamos os últimos 10 concursos para garantir que prêmios que chegaram depois sejam salvos
+    for (let i = startFrom; i <= latestNum; i++) {
+      try {
+        const data = await fetchConcursoByNumber(i);
+        
+        const { data: anterior } = await supabase
+          .from('concursos')
+          .select('*')
+          .eq('concurso', i - 1)
+          .maybeSingle();
 
-    for (let i = syncStart; i <= latestNum && count < limit; i++) {
-      const data = await fetchConcursoByNumber(i);
-      
-      const { data: anterior } = await supabase
-        .from('concursos')
-        .select('*')
-        .eq('concurso', i - 1)
-        .maybeSingle();
-
-      const processed = processConcursoData(data, anterior || undefined);
-      await supabase.from('concursos').upsert(processed, { onConflict: 'concurso' });
-      count++;
+        const processed = processConcursoData(data, anterior || undefined);
+        
+        // Só faz o upsert se tivermos dezenas (evita salvar lixo se a API falhar)
+        if (processed.dezenas.length === 15) {
+          await supabase.from('concursos').upsert(processed, { onConflict: 'concurso' });
+          count++;
+        }
+      } catch (err) {
+        console.warn(`Erro ao processar concurso ${i}:`, err);
+      }
     }
 
     await updateAllGamesPoints();
 
     return { 
       message: count > 0 
-        ? `Sincronizados ${count} concursos!` 
-        : 'Sincronização concluída.' 
+        ? `Sincronizados ${count} concursos com sucesso!` 
+        : 'Sincronização concluída (sem novos dados).' 
     };
   } catch (error) {
     console.error('Erro na sincronização global:', error);
