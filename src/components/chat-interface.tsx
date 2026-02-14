@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Mic, Square, Loader2, Bot, CheckCheck, Trash2 } from "lucide-react";
+import { Send, Mic, Square, Loader2, Bot, CheckCheck, Trash2, Maximize2, Minimize2 } from "lucide-react";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { processChatInteraction, transcribeAudio } from "@/lib/gemini-chat";
 import { cn } from "@/lib/utils";
@@ -25,22 +25,20 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
   const [backtests, setBacktests] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<ChatStatus>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const userName = profile?.first_name || "Você";
 
-  // Carrega histórico de mensagens e dados de contexto
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-      
       const [messagesRes, gamesRes, backtestsRes] = await Promise.all([
         supabase.from('chat_messages').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
         supabase.from('jogos').select('*').order('criado_em', { ascending: false }).limit(20),
         supabase.from('backtests').select('*').order('created_at', { ascending: false }).limit(5)
       ]);
-
       if (messagesRes.data) setMessages(messagesRes.data);
       if (gamesRes.data) setUserGames(gamesRes.data);
       if (backtestsRes.data) setBacktests(backtestsRes.data);
@@ -48,83 +46,49 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
     fetchData();
   }, [user]);
 
-  // Rolagem automática
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, status]);
+  }, [messages, status, isExpanded]);
 
-  const cleanMarkdown = (text: string) => {
-    return text.replace(/[*#_~`]/g, '').trim();
-  };
+  const cleanMarkdown = (text: string) => text.replace(/[*#_~`]/g, '').trim();
 
   const handleClearChat = async () => {
     if (!user) return;
     try {
-      const { error } = await supabase.from('chat_messages').delete().eq('user_id', user.id);
-      if (error) throw error;
+      await supabase.from('chat_messages').delete().eq('user_id', user.id);
       setMessages([]);
-      toast.success("Histórico de conversa removido.");
+      toast.success("Conversa limpa.");
     } catch (error) {
-      toast.error("Não consegui limpar o chat agora.");
+      toast.error("Erro ao limpar.");
     }
   };
 
   const sendMessage = async (content: string, type: 'text' | 'audio' = 'text') => {
     if (!content.trim() || !user) return;
 
-    const userMessage = { 
-      user_id: user.id, 
-      role: 'user', 
-      content, 
-      type, 
-      created_at: new Date().toISOString() 
-    };
-    
-    // Salva mensagem do usuário no banco
+    const userMessage = { user_id: user.id, role: 'user', content, type, created_at: new Date().toISOString() };
     await supabase.from('chat_messages').insert(userMessage);
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setStatus("lendo");
     
     try {
-      const responsePromise = processChatInteraction(
-        [...messages, userMessage], 
-        stats, 
-        userGames, 
-        backtests,
-        user.id
-      );
-
-      setTimeout(() => setStatus("analisando"), 800);
-      setTimeout(() => setStatus("digitando"), 1800);
-
-      const response = await responsePromise;
+      const response = await processChatInteraction([...messages, userMessage], stats, userGames, backtests, user.id);
       
       const genMatch = response.match(/\[GENERATE:(\d+)\]/);
       let cleanResponse = cleanMarkdown(response.replace(/\[GENERATE:\d+\]/g, ""));
 
       if (genMatch && onGenerateRequest) {
-        const qty = parseInt(genMatch[1]);
-        onGenerateRequest(qty);
-        cleanResponse += `\n\nBeleza! Já estou gerando esses ${qty} jogos pra você agora mesmo.`;
+        onGenerateRequest(parseInt(genMatch[1]));
       }
 
-      const assistantMessage = {
-        user_id: user.id,
-        role: 'assistant',
-        content: cleanResponse,
-        type: 'text',
-        created_at: new Date().toISOString()
-      };
-      
-      // Salva resposta da IA no banco
+      const assistantMessage = { user_id: user.id, role: 'assistant', content: cleanResponse, type: 'text', created_at: new Date().toISOString() };
       await supabase.from('chat_messages').insert(assistantMessage);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error(error);
-      toast.error("Tive um probleminha aqui. Tenta de novo?");
+      toast.error("Erro na IA.");
     } finally {
       setStatus(null);
     }
@@ -132,34 +96,25 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
 
   const handleAudio = async () => {
     if (!user) return;
-    
     if (isRecording) {
-      setStatus("lendo");
-      try {
-        const base64 = await stopRecording();
-        if (base64) {
-          const transcription = await transcribeAudio(base64, user.id);
-          if (transcription && transcription !== "Não consegui entender o áudio.") {
-            sendMessage(transcription, 'audio');
-          } else {
-            setStatus(null);
-            toast.error("Não entendi muito bem o áudio.");
-          }
-        }
-      } catch (error) {
-        setStatus(null);
-        toast.error("Erro no microfone.");
+      const base64 = await stopRecording();
+      if (base64) {
+        const trans = await transcribeAudio(base64, user.id);
+        if (trans && trans !== "Não entendi o áudio.") sendMessage(trans, 'audio');
       }
-    } else {
-      startRecording();
-    }
+    } else startRecording();
   };
 
   return (
-    <div className="flex flex-col h-[650px] bg-[#E5DDD5] dark:bg-slate-950 rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors relative">
+    <div className={cn(
+      "flex flex-col bg-[#E5DDD5] dark:bg-slate-950 shadow-2xl transition-all duration-300 relative",
+      isExpanded 
+        ? "fixed inset-0 z-[100] h-screen w-screen" 
+        : "h-[650px] rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden"
+    )}>
       <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:invert" />
 
-      {/* Header WhatsApp Style */}
+      {/* Header */}
       <div className="bg-[#075E54] dark:bg-slate-900 p-4 flex items-center justify-between z-10 shadow-md">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -170,118 +125,55 @@ export const ChatInterface = ({ stats, onGenerateRequest }: ChatInterfaceProps) 
           </div>
           <div>
             <h3 className="text-white font-black text-xs uppercase italic tracking-widest">IA LotoExpert</h3>
-            <p className="text-[9px] text-emerald-100/70 font-bold uppercase tracking-tighter">
-              {status === "lendo" && "Lendo sua mensagem..."}
-              {status === "analisando" && "Analisando dados..."}
-              {status === "digitando" && "Escrevendo resposta..."}
-              {!status && "Online agora"}
-            </p>
+            <p className="text-[9px] text-emerald-100/70 font-bold uppercase">{status || "Online"}</p>
           </div>
         </div>
 
-        <button 
-          onClick={handleClearChat}
-          className="p-2 text-white/50 hover:text-rose-400 transition-colors"
-          title="Limpar Conversa"
-        >
-          <Trash2 className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setIsExpanded(!isExpanded)} className="p-2 text-white/50 hover:text-white transition-colors">
+            {isExpanded ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+          </button>
+          <button onClick={handleClearChat} className="p-2 text-white/50 hover:text-rose-400 transition-colors">
+            <Trash2 className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
-      {/* Chat Area - Scrollable */}
-      <div 
-        ref={scrollRef} 
-        className="flex-1 overflow-y-auto p-4 space-y-6 z-10 scrollbar-hide scroll-smooth"
-      >
-        {messages.length === 0 && (
-          <div className="flex justify-center my-10">
-            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-6 py-3 rounded-2xl text-[10px] font-bold uppercase text-center border border-amber-200 dark:border-amber-800/50 shadow-sm max-w-[80%]">
-              Suas conversas são privadas e ficam salvas para sua consulta.
-            </div>
-          </div>
-        )}
-
+      {/* Chat */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 z-10 scrollbar-hide">
         {messages.map((msg, i) => (
-          <div 
-            key={i} 
-            className={cn(
-              "flex flex-col max-w-[90%] animate-in fade-in slide-in-from-bottom-2 duration-300", 
-              msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start"
-            )}
-          >
-            <span className={cn(
-              "text-[9px] font-black uppercase italic mb-1 px-2 tracking-widest",
-              msg.role === 'user' ? "text-slate-500 text-right" : "text-indigo-600 dark:text-indigo-400"
-            )}>
+          <div key={i} className={cn("flex flex-col max-w-[90%]", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
+            <span className={cn("text-[9px] font-black uppercase italic mb-1 px-2 tracking-widest", msg.role === 'user' ? "text-slate-500" : "text-indigo-600 dark:text-indigo-400")}>
               {msg.role === 'user' ? userName : "IA LotoExpert"}
             </span>
-
-            <div className={cn(
-              "p-4 rounded-2xl text-xs font-medium shadow-sm relative min-w-[100px]", 
-              msg.role === 'user' 
-                ? "bg-[#DCF8C6] dark:bg-indigo-600 text-slate-800 dark:text-white rounded-tr-none" 
-                : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700"
-            )}>
-              <div className="whitespace-pre-wrap pb-4 leading-relaxed">
-                {msg.content}
-              </div>
-              
-              <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1">
-                <span className="text-[8px] font-bold opacity-40">
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {msg.role === 'user' && (
-                  <CheckCheck className="h-3 w-3 text-sky-500" />
-                )}
+            <div className={cn("p-4 rounded-2xl text-xs font-medium shadow-sm relative", msg.role === 'user' ? "bg-[#DCF8C6] dark:bg-indigo-600 text-slate-800 dark:text-white rounded-tr-none" : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none")}>
+              <div className="whitespace-pre-wrap pb-4 leading-relaxed">{msg.content}</div>
+              <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 opacity-40">
+                <span className="text-[8px] font-bold">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                {msg.role === 'user' && <CheckCheck className="h-3 w-3 text-sky-500" />}
               </div>
             </div>
           </div>
         ))}
-
-        {status && (
-          <div className="flex flex-col items-start max-w-[85%] animate-in fade-in slide-in-from-bottom-2">
-            <span className="text-[9px] font-black uppercase italic mb-1 px-2 tracking-widest text-indigo-600 dark:text-indigo-400">
-              IA LotoExpert
-            </span>
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Input Area */}
+      {/* Input */}
       <div className="p-3 bg-[#F0F0F0] dark:bg-slate-900 flex items-center gap-2 z-10 border-t dark:border-slate-800">
         <div className="flex-1 flex items-center bg-white dark:bg-slate-800 rounded-full px-4 py-1 shadow-sm border border-slate-200 dark:border-slate-700">
           <Input 
             value={input} 
             onChange={(e) => setInput(e.target.value)} 
             onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)} 
-            placeholder={isRecording ? "Pode falar, tô ouvindo..." : "Manda sua dúvida aqui..."} 
+            placeholder="Diga algo..." 
             disabled={isRecording || !!status}
-            className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400" 
+            className="border-none bg-transparent focus-visible:ring-0 h-10 text-sm" 
           />
-          <button 
-            onClick={handleAudio} 
-            className={cn(
-              "p-2 rounded-full transition-all", 
-              isRecording ? "text-rose-500 animate-pulse" : "text-slate-400 hover:text-indigo-600"
-            )}
-          >
+          <button onClick={handleAudio} className={cn("p-2", isRecording ? "text-rose-500 animate-pulse" : "text-slate-400")}>
             {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </button>
         </div>
-        
-        <Button 
-          onClick={() => sendMessage(input)} 
-          disabled={!input.trim() || isRecording || !!status} 
-          className="rounded-full h-12 w-12 bg-[#128C7E] hover:bg-[#075E54] dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white shadow-md shrink-0 p-0"
-        >
-          <Send className="h-5 w-5" />
+        <Button onClick={() => sendMessage(input)} disabled={!input.trim() || !!status} className="rounded-full h-12 w-12 bg-[#128C7E] p-0">
+          <Send className="h-5 w-5 text-white" />
         </Button>
       </div>
     </div>
