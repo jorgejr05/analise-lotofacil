@@ -54,7 +54,7 @@ export default function Dashboard() {
 
   const formatCurrency = (value: any) => {
     const num = parseFloat(value);
-    if (isNaN(num)) return "R$ ---";
+    if (isNaN(num) || num === 0) return "R$ ---";
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
@@ -62,7 +62,6 @@ export default function Dashboard() {
     const premiacao = stats?.ultimoConcurso?.premiacao_json;
     if (!premiacao || !Array.isArray(premiacao)) return "R$ ---";
     
-    // Procura por faixa (15 acertos = faixa 1) ou descrição
     const faixa = premiacao.find((p: any) => p.faixa === (16 - hits) || p.descricao?.includes(`${hits} acertos`));
     return formatCurrency(faixa?.valor || 0);
   };
@@ -106,12 +105,12 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-indigo-600 p-6 rounded-tr-[3rem] rounded-bl-[3rem] shadow-lg flex flex-col justify-between h-32 text-white">
-            <ArrowRightCircle className="h-5 w-5 text-indigo-200" />
+            <Trophy className="h-5 w-5 text-indigo-200" />
             <div>
               <div className="text-lg md:text-xl font-black tracking-tighter truncate">
-                {formatCurrency(stats?.ultimoConcurso?.valor_estimado || 0)}
+                {getPrizeByHits(15)}
               </div>
-              <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Próximo Estimado</p>
+              <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Último Prêmio (15 pts)</p>
             </div>
           </div>
 
