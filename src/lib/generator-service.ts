@@ -1,94 +1,83 @@
-import { Concurso } from "./lotofacil-service";
+"use server";
 
-interface Stats {
-  freq50: Record<number, number>;
-  freq200: Record<number, number>;
-  freqTotal: Record<number, number>;
-  atraso: Record<number, number>;
-  somaMedia: number;
-  paresMedia: number;
-  ultimoConcurso: Concurso;
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Versão de Alta Precisão (50k simulações) para busca de 14/15 pontos.
+ * Esta função busca os dados internamente para ser usada em Server Components/Actions.
+ */
+export async function generateAdvancedGames(count: number = 6) {
+  const { data: concursos } = await supabase
+    .from('concursos')
+    .select('dezenas, soma, pares')
+    .order('concurso', { ascending: false })
+    .limit(200);
+
+  const { data: activeModel } = await supabase
+    .from('model_versions')
+    .select('*')
+    .eq('is_ativo', true)
+    .maybeSingle();
+
+  if (!concursos || concursos.length === 0) return [];
+
+  const pesos = activeModel?.pesos_json || { f50: 0.35, f200: 0.30, ftot: 0.20, atr: 0.15 };
+  
+  const stats = Array.from({ length: 25 }, (_, i) => {
+    const num = i + 1;
+    const f50 = concursos.slice(0, 50).filter(c => c.dezenas.includes(num)).length / 50;
+    const f200 = concursos.filter(c => c.dezenas.includes(num)).length / concursos.length;
+    let lastIndex = concursos.findIndex(c => c.dezenas.includes(num));
+    const atraso = lastIndex === -1 ? 10 : lastIndex;
+    const score = (f50 * pesos.f50) + (f200 * pesos.f200) + (atraso * 0.1 * pesos.atr);
+    return { num, score };
+  });
+
+  const candidates: { dezenas: number[], fitness: number }[] = [];
+  for (let i = 0; i < 50000; i++) {
+    const available = [...stats].sort((a, b) => b.score - a.score + (Math.random() * 0.2 - 0.1));
+    const finalGame = available.slice(0, 15).map(d => d.num).sort((a, b) => a - b);
+    
+    const soma = finalGame.reduce((a, b) => a + b, 0);
+    const pares = finalGame.filter(n => n % 2 === 0).length;
+    const repetidas = finalGame.filter(n => concursos[0].dezenas.includes(n)).length;
+
+    let fitness = 100;
+    if (soma < 180 || soma > 210) fitness -= 40;
+    if (pares < 7 || pares > 9) fitness -= 30;
+    if (repetidas < 8 || repetidas > 10) fitness -= 30;
+    candidates.push({ dezenas: finalGame, fitness });
+  }
+
+  return candidates
+    .sort((a, b) => b.fitness - a.fitness)
+    .slice(0, count)
+    .map(c => c.dezenas);
 }
 
 /**
- * Calcula a pontuação de saúde (Fitness) de um jogo
- * Baseado em: Soma, Paridade, Repetidas e Números na Moldura
+ * Mantendo a função original para compatibilidade com o Laboratório (Backtests).
  */
-const calculateFitness = (game: number[], stats: Stats): number => {
-  let score = 0;
-  const { ultimoConcurso } = stats;
-  
-  const soma = game.reduce((a, b) => a + b, 0);
-  const pares = game.filter(n => n % 2 === 0).length;
-  const repetidas = game.filter(n => ultimoConcurso.dezenas.includes(n)).length;
-  const moldura = game.filter(n => [1,2,3,4,5,6,10,11,15,16,20,21,22,23,24,25].includes(n)).length;
+export const generateProbabilisticGames = (stats: any, quantity: number = 1): number[][] => {
+  const { freq50, freq200, freqTotal, atraso, ultimoConcurso } = stats;
+  const games: number[][] = [];
 
-  // Filtros de Ouro (Pontuação Máxima se estiver no range ideal)
-  if (soma >= 180 && soma <= 210) score += 25;
-  if (pares >= 7 && pares <= 9) score += 25;
-  if (repetidas >= 8 && repetidas <= 10) score += 25;
-  if (moldura >= 9 && moldura <= 11) score += 25;
+  for (let q = 0; q < quantity; q++) {
+    const scores = Array.from({ length: 25 }, (_, i) => {
+      const num = i + 1;
+      const f50 = (freq50[num] || 0) / 100;
+      const f200 = (freq200[num] || 0) / 100;
+      const fTot = (freqTotal[num] || 0) / 100;
+      const atr = Math.min((atraso[num] || 0) / 10, 1);
+      return { num, score: (f50 * 0.35) + (f200 * 0.30) + (fTot * 0.20) + (atr * 0.15) + (Math.random() * 0.1) };
+    });
 
-  return score;
-};
-
-export const generateProbabilisticGames = (stats: Stats, quantity: number = 1): number[][] => {
-  const { freq50, freq200, freqTotal, atraso } = stats;
-  const scores: Record<number, number> = {};
-
-  // Score Base Adaptativo
-  for (let i = 1; i <= 25; i++) {
-    const f50 = (freq50[i] || 0) / 100;
-    const f200 = (freq200[i] || 0) / 100;
-    const fTot = (freqTotal[i] || 0) / 100;
-    const atr = Math.min((atraso[i] || 0) / 10, 1);
-    scores[i] = (f50 * 0.35) + (f200 * 0.30) + (fTot * 0.20) + (atr * 0.15);
+    const game = scores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 15)
+      .map(d => d.num)
+      .sort((a, b) => a - b);
+    games.push(game);
   }
-
-  // --- MONTE CARLO SIMULATION ---
-  // Geramos uma massa de 10.000 jogos candidatos
-  const simulationPool: { game: number[], fitness: number }[] = [];
-  const SIMULATION_SIZE = 10000;
-
-  for (let i = 0; i < SIMULATION_SIZE; i++) {
-    const candidate: number[] = [];
-    const sortedByScore = Object.entries(scores)
-      .map(([num, score]) => ({ 
-        num: Number(num), 
-        score: score + (Math.random() * 0.3) // Ruído aumentado para diversidade na massa
-      }))
-      .sort((a, b) => b.score - a.score);
-
-    // Composição dinâmica
-    const top = sortedByScore.slice(0, 12).map(d => d.num);
-    const mid = sortedByScore.slice(12, 19).map(d => d.num);
-    const low = sortedByScore.slice(19).map(d => d.num);
-
-    while (candidate.length < 9) {
-      const n = top[Math.floor(Math.random() * top.length)];
-      if (!candidate.includes(n)) candidate.push(n);
-    }
-    while (candidate.length < 13) {
-      const n = mid[Math.floor(Math.random() * mid.length)];
-      if (!candidate.includes(n)) candidate.push(n);
-    }
-    while (candidate.length < 15) {
-      const n = low[Math.floor(Math.random() * low.length)];
-      if (!candidate.includes(n)) candidate.push(n);
-    }
-
-    const game = candidate.sort((a, b) => a - b);
-    const fitness = calculateFitness(game, stats);
-    
-    // Só adicionamos ao pool se o fitness for relevante (> 50%)
-    if (fitness >= 75) {
-      simulationPool.push({ game, fitness });
-    }
-  }
-
-  // Ordenamos o pool pelos melhores jogos (Fitness 100) e pegamos a quantidade pedida
-  return simulationPool
-    .sort((a, b) => b.fitness - a.fitness || Math.random() - 0.5)
-    .slice(0, quantity)
-    .map(item => item.game);
+  return games;
 };
