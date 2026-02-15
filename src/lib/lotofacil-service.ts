@@ -4,27 +4,48 @@ import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
 /**
- * Tenta buscar um concurso específico em múltiplos provedores com bypass de cache total.
+ * Busca dados da Lotofácil usando a API Guidi (Primária) com Fallback.
  */
 async function fetchConcursoFromAnywhere(num?: number) {
   const providers = [
+    // Provedor 1: API Guidi (Gratuita e Estável)
+    async () => {
+      const url = num 
+        ? `https://api.guidi.dev.br/loteria/lotofacil/${num}`
+        : `https://api.guidi.dev.br/loteria/lotofacil/ultimo`;
+      
+      const res = await fetch(url, { 
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (!res.ok) return null;
+      const d = await res.json();
+      
+      // Normalização para o processador
+      return { 
+        concurso: d.numero || d.concurso, 
+        data: d.data, 
+        dezenas: d.listaDezenas || d.dezenas, 
+        rateio: d.listaRateio || d.premiacoes, 
+        estimativa: d.valorEstimadoProximoConcurso 
+      };
+    },
+    // Provedor 2: Loterias API Vercel (Fallback)
     async () => {
       const url = num 
         ? `https://loterias-api.vercel.app/api/lotofacil/${num}`
         : `https://loterias-api.vercel.app/api/lotofacil/latest`;
-      const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) return null;
       const d = await res.json();
-      return { concurso: d.concurso || d.numero, data: d.data, dezenas: d.dezenas, rateio: d.premiacoes || d.listaRateio, estimativa: d.valorEstimadoProximoConcurso };
-    },
-    async () => {
-      const url = num 
-        ? `https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/${num}`
-        : `https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/`;
-      const res = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } });
-      if (!res.ok) return null;
-      const d = await res.json();
-      return { concurso: d.numero, data: d.dataApuração, dezenas: d.listaDezenas, rateio: d.listaRateio, estimativa: d.valorEstimadoProximoConcurso };
+      return { 
+        concurso: d.concurso || d.numero, 
+        data: d.data, 
+        dezenas: d.dezenas, 
+        rateio: d.premiacoes || d.listaRateio, 
+        estimativa: d.valorEstimadoProximoConcurso 
+      };
     }
   ];
 
@@ -41,7 +62,7 @@ async function fetchConcursoFromAnywhere(num?: number) {
 
 export const syncLatestResults = async () => {
   try {
-    // 1. Pegar o maior número de concurso salvo
+    // 1. Identifica o último concurso no banco (ex: 3613)
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -51,28 +72,24 @@ export const syncLatestResults = async () => {
 
     const lastNum = lastSaved?.concurso || 0;
     
-    // 2. Detectar o último online
+    // 2. Verifica qual o último concurso disponível na API
     const latestOnline = await fetchConcursoFromAnywhere();
-    const targetNum = latestOnline ? Math.max(Number(latestOnline.concurso), lastNum + 1) : lastNum + 1;
+    if (!latestOnline) return { success: false, message: "Servidores de resultados indisponíveis." };
+
+    const targetNum = Number(latestOnline.concurso);
+    
+    // Se o banco já tem o último, não faz nada
+    if (targetNum <= lastNum) {
+      return { success: true, message: "Base de dados sincronizada.", latest: lastNum };
+    }
 
     let count = 0;
-    // 3. Loop de sincronização
-    for (let i = lastNum + 1; i <= targetNum + 2; i++) {
-      // Verificação extra: o concurso já existe? (Prevenção de duplicatas via código)
-      const { data: exists } = await supabase
-        .from('concursos')
-        .select('id')
-        .eq('concurso', i)
-        .maybeSingle();
-
-      if (exists) continue;
-
+    // 3. Sincronização Incremental: busca apenas do (lastNum + 1) até o targetNum
+    for (let i = lastNum + 1; i <= targetNum; i++) {
       const rawData = await fetchConcursoFromAnywhere(i);
-      if (!rawData) {
-        if (i > targetNum) break;
-        continue;
-      }
+      if (!rawData) continue;
 
+      // Busca o anterior para calcular repetidas
       const { data: anterior } = await supabase
         .from('concursos')
         .select('*')
@@ -81,7 +98,6 @@ export const syncLatestResults = async () => {
 
       const processed = processConcursoData(rawData, anterior || undefined);
       
-      // Upsert garantido pela restrição UNIQUE no banco
       const { error } = await supabase
         .from('concursos')
         .upsert(processed, { onConflict: 'concurso' });
@@ -91,11 +107,11 @@ export const syncLatestResults = async () => {
 
     return { 
       success: true, 
-      message: count > 0 ? `Sincronizados ${count} novos resultados.` : "O sistema já está atualizado.",
+      message: count > 0 ? `${count} novos concursos adicionados.` : "Sincronizado.",
       latest: targetNum
     };
   } catch (error: any) {
     console.error('[Sync Error]', error);
-    throw error;
+    return { success: false, message: "Falha na atualização incremental." };
   }
 };
