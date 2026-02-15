@@ -5,13 +5,16 @@ export const calculatePoints = (jogoDezenas: number[], sorteioDezenas: number[])
   return j.filter(num => s.includes(num)).length;
 };
 
+/**
+ * Processa os dados brutos da API Guidi para o formato do nosso banco de dados.
+ */
 export const processConcursoData = (data: any, anterior?: any) => {
-  // Normalização de dezenas (garante que sejam números)
-  const rawDezenas = data.dezenas || data.listaDezenas || [];
+  // A API Guidi usa 'listaDezenas' e 'numero'
+  const rawDezenas = data.listaDezenas || data.dezenas || [];
   const dezenas = rawDezenas.map((n: any) => Number(n)).sort((a: number, b: number) => a - b);
   
-  const concursoNum = Number(data.concurso || data.numero);
-  const dataSorteio = data.data || data.dataApuração || data.data_sorteio || data.data_apuracao;
+  const concursoNum = Number(data.numero || data.concurso);
+  const dataSorteio = data.data;
 
   const soma = dezenas.reduce((acc: number, curr: number) => acc + curr, 0);
   const pares = dezenas.filter((n: number) => n % 2 === 0).length;
@@ -23,25 +26,26 @@ export const processConcursoData = (data: any, anterior?: any) => {
     repetidas_anterior = dezenas.filter((n: number) => dezenasAnterior.includes(n)).length;
   }
 
-  // Normalização do Rateio
-  let rawRateio = data.listaRateio || data.premiacoes || data.rateio || [];
+  // Processamento do Rateio (API Guidi usa 'listaRateio')
+  let rawRateio = data.listaRateio || [];
   const prizesMap: Record<number, { valor: number, ganhadores: number }> = {};
   
   if (Array.isArray(rawRateio)) {
     rawRateio.forEach((p: any) => {
-      const numHits = p.numeroDeAcertos || p.acertos || (p.descricao?.match(/(\d+) acertos/)?.[1]) || (16 - (p.faixa || 0));
-      const hits = Number(numHits);
+      // A API Guidi retorna faixas de 1 a 5 (15 a 11 acertos)
+      const hits = p.numeroDeAcertos || (16 - (p.faixa || 0));
+      const numHits = Number(hits);
       
-      if (hits >= 11 && hits <= 15) {
-        prizesMap[hits] = {
-          valor: Number(p.valor || p.valorPremio || p.premio || 0),
+      if (numHits >= 11 && numHits <= 15) {
+        prizesMap[numHits] = {
+          valor: Number(p.valor || p.valorPremio || 0),
           ganhadores: Number(p.numeroDeGanhadores || p.ganhadores || 0)
         };
       }
     });
   }
 
-  // Fallbacks obrigatórios da Lotofácil
+  // Fallbacks de valores fixos da Lotofácil
   if (!prizesMap[11] || prizesMap[11].valor <= 0) prizesMap[11] = { valor: 7, ganhadores: prizesMap[11]?.ganhadores || 0 };
   if (!prizesMap[12] || prizesMap[12].valor <= 0) prizesMap[12] = { valor: 14, ganhadores: prizesMap[12]?.ganhadores || 0 };
   if (!prizesMap[13] || prizesMap[13].valor <= 0) prizesMap[13] = { valor: 35, ganhadores: prizesMap[13]?.ganhadores || 0 };
@@ -53,15 +57,13 @@ export const processConcursoData = (data: any, anterior?: any) => {
     ganhadores: prizesMap[hits]?.ganhadores || 0
   }));
 
-  // Normalização de data para ISO YYYY-MM-DD
+  // Normalização de data (DD/MM/YYYY -> YYYY-MM-DD)
   let formattedDate = "2024-01-01";
-  if (typeof dataSorteio === 'string') {
-    if (dataSorteio.includes('/')) {
-      const parts = dataSorteio.split('/');
-      if (parts.length === 3) formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-    } else if (dataSorteio.includes('-')) {
-      formattedDate = dataSorteio.split('T')[0];
-    }
+  if (typeof dataSorteio === 'string' && dataSorteio.includes('/')) {
+    const parts = dataSorteio.split('/');
+    if (parts.length === 3) formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+  } else if (typeof dataSorteio === 'string' && dataSorteio.includes('-')) {
+    formattedDate = dataSorteio.split('T')[0];
   }
 
   return {
@@ -73,6 +75,6 @@ export const processConcursoData = (data: any, anterior?: any) => {
     impares,
     repetidas_anterior,
     premiacao_json,
-    valor_estimado: Number(data.valorEstimadoProximoConcurso || data.valor_estimado_proximo_concurso || 0)
+    valor_estimado: Number(data.valorEstimadoProximoConcurso || 0)
   };
 };
