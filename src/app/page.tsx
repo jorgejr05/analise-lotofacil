@@ -26,32 +26,30 @@ export default function Dashboard() {
     try {
       const res = await syncLatestResults();
       if (!silent && res.success) {
-        // Verificação robusta para evitar erro de 'possibly undefined'
         const count = (res as any).count ?? 0;
         if (count > 0) {
-          toast.success(`${count} novo(s) concurso(s) adicionado(s).`);
+          toast.success(`${count} novo(s) concurso(s) sincronizado(s)!`);
         } else {
-          toast.info("A base de dados já está atualizada.");
+          toast.info("Nenhum resultado novo disponível na API ainda.");
         }
       }
       await refresh(); 
       await loadNextDrawInfo();
     } catch (error) {
-      if (!silent) toast.error("Falha na sincronização.");
+      if (!silent) toast.error("Falha na sincronização com a API.");
     } finally {
       setSyncing(false);
     }
   }, [syncing, refresh, loadNextDrawInfo]);
 
-  // Sincroniza apenas uma vez ao montar o componente
+  // Carga inicial de informações
   useEffect(() => {
     if (!loading) {
-      handleSync(true);
       loadNextDrawInfo();
     }
-  }, [loading, handleSync, loadNextDrawInfo]);
+  }, [loading, loadNextDrawInfo]);
 
-  // Apenas atualiza o relógio da UI
+  // Relógio da UI
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
@@ -111,10 +109,15 @@ export default function Dashboard() {
             <Button 
               onClick={() => handleSync()} 
               disabled={syncing}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
+              className={cn(
+                "rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs",
+                nextDraw?.isPendingSync 
+                  ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-100 dark:shadow-amber-900/20 animate-bounce" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 dark:shadow-indigo-900/20"
+              )}
             >
               <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
-              {syncing ? 'Sincronizando...' : 'Sincronizar Base'}
+              {syncing ? 'Sincronizando...' : nextDraw?.isPendingSync ? 'Resolver Pendência' : 'Sincronizar Base'}
             </Button>
 
             {nextDraw && (
@@ -128,7 +131,7 @@ export default function Dashboard() {
                 <div className="flex flex-col">
                   <span className="text-[8px] font-black uppercase tracking-widest">Status do Alvo #{nextDraw.nextNum}</span>
                   <span className="text-[10px] font-black italic uppercase">
-                    {nextDraw.isPendingSync ? "Sincronização Pendente" : "Aguardando Próximo Sorteio"}
+                    {nextDraw.isPendingSync ? "Resultado Disponível para Sincronia" : "Base de Dados Atualizada"}
                   </span>
                 </div>
               </div>
