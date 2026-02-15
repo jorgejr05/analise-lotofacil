@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults, getNextDrawInfo } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2, Target, Calendar } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2, Target, Calendar, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -26,11 +26,10 @@ export default function Dashboard() {
     try {
       const res = await syncLatestResults();
       if (!silent && res.success) toast.success(res.message);
-      if (!silent && !res.success) toast.error(res.message);
       await refresh(); 
       await loadNextDrawInfo();
     } catch (error) {
-      if (!silent) toast.error("Erro ao sincronizar dados.");
+      if (!silent) toast.error("Erro na sincronização.");
     } finally {
       setSyncing(false);
     }
@@ -46,8 +45,8 @@ export default function Dashboard() {
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date());
-      // A cada minuto, se estivermos em horário de sorteio, tenta sincronizar
-      if (new Date().getSeconds() === 0 && nextDraw?.isWaitingResult) {
+      // Tenta sincronizar a cada 30 segundos se estivermos esperando resultado
+      if (new Date().getSeconds() % 30 === 0 && nextDraw?.isWaitingResult) {
         handleSync(true);
       }
     }, 1000);
@@ -84,10 +83,8 @@ export default function Dashboard() {
     if (hits === 11) return formatCurrency(7);
     if (hits === 12) return formatCurrency(14);
     if (hits === 13) return formatCurrency(35);
-
     const premiacao = stats?.ultimoConcurso?.premiacao_json;
     if (!premiacao || !Array.isArray(premiacao)) return "R$ ---";
-    
     const faixa = premiacao.find((p: any) => p.faixa === (16 - hits) || p.descricao?.includes(`${hits} acertos`));
     return formatCurrency(faixa?.valor || 0);
   };
@@ -119,7 +116,7 @@ export default function Dashboard() {
               className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
             >
               <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
-              {syncing ? 'Atualizando...' : 'Atualizar Resultados'}
+              {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
             </Button>
 
             {nextDraw && (
@@ -129,11 +126,11 @@ export default function Dashboard() {
                   ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 animate-pulse" 
                   : "bg-white border-slate-100 text-slate-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400"
               )}>
-                <Target className={cn("h-4 w-4", nextDraw.isWaitingResult ? "text-amber-500" : "text-slate-400")} />
+                {nextDraw.isWaitingResult ? <AlertCircle className="h-4 w-4 text-amber-500" /> : <Target className="h-4 w-4 text-slate-400" />}
                 <div className="flex flex-col">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Próximo Alvo</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest">Alvo Sequencial</span>
                   <span className="text-[10px] font-black italic uppercase">
-                    #{nextDraw.nextNum} {nextDraw.isWaitingResult ? "• BUSCANDO RESULTADO..." : `• ${nextDraw.nextDrawDate.toLocaleDateString('pt-BR')} 20:00`}
+                    #{nextDraw.nextNum} {nextDraw.isWaitingResult ? "• BUSCANDO NA API..." : `• PREVISTO: ${nextDraw.nextDrawDate.toLocaleDateString('pt-BR')} 20:00`}
                   </span>
                 </div>
               </div>

@@ -4,14 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
 /**
- * Busca dados de um concurso específico ou o último disponível.
+ * Busca dados de um concurso específico.
  */
-async function fetchGuidiData(num?: number) {
+async function fetchGuidiData(num: number) {
   try {
-    const url = num 
-      ? `https://api.guidi.dev.br/loteria/lotofacil/${num}`
-      : `https://api.guidi.dev.br/loteria/lotofacil/ultimo`;
-    
+    const url = `https://api.guidi.dev.br/loteria/lotofacil/${num}`;
     const res = await fetch(url, { 
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
@@ -20,13 +17,13 @@ async function fetchGuidiData(num?: number) {
     if (!res.ok) return null;
     return await res.json();
   } catch (error) {
-    console.error("[Guidi API Error]", error);
+    console.error(`[Guidi API Error] Concurso ${num}:`, error);
     return null;
   }
 }
 
 /**
- * Calcula informações sobre o próximo sorteio esperado.
+ * Calcula informações sobre o próximo sorteio esperado e detecta atrasos.
  */
 export async function getNextDrawInfo() {
   const { data: lastSaved } = await supabase
@@ -41,20 +38,23 @@ export async function getNextDrawInfo() {
   
   const now = new Date();
   const currentHour = now.getHours();
-  const currentDay = now.getDay(); // 0 = Domingo, 1 = Segunda... 6 = Sábado
+  const currentDay = now.getDay();
 
-  // Lotofácil: Segunda (1) a Sábado (6) às 20h
-  const isDrawDay = currentDay >= 1 && currentDay <= 6;
-  const isAfterDrawTime = currentHour >= 20;
+  // Lógica de detecção de atraso:
+  // Se o último salvo foi sexta (#3612) e hoje é domingo, o #3613 (sábado) está atrasado.
+  // Não esperamos segunda para buscar o #3613.
   
-  // Se for dia de sorteio e já passou das 20h, estamos "em busca" do resultado
-  const isWaitingResult = isDrawDay && isAfterDrawTime;
+  const nextDrawDate = calculateNextDrawDate(now);
+  
+  // Se a data atual já passou das 20h de um dia de sorteio, ou se estamos em um dia 
+  // posterior ao sorteio esperado do nextNum, estamos em "Atraso/Busca Ativa".
+  const isWaitingResult = (currentDay >= 1 && currentDay <= 6 && currentHour >= 20) || (currentDay === 0);
 
   return {
     lastNum,
     nextNum,
     isWaitingResult,
-    nextDrawDate: calculateNextDrawDate(now)
+    nextDrawDate
   };
 }
 
@@ -63,15 +63,15 @@ function calculateNextDrawDate(now: Date) {
   const hour = next.getHours();
   const day = next.getDay();
 
-  // Se for domingo, o próximo é segunda
+  // Se for domingo, o próximo oficial é segunda
   if (day === 0) {
     next.setDate(next.getDate() + 1);
   } 
-  // Se for sábado após as 20h, o próximo é segunda
+  // Se for sábado após as 20h, o próximo oficial é segunda
   else if (day === 6 && hour >= 20) {
     next.setDate(next.getDate() + 2);
   }
-  // Se for dia de semana após as 20h, o próximo é amanhã
+  // Se for dia de semana após as 20h, o próximo oficial é amanhã
   else if (hour >= 20) {
     next.setDate(next.getDate() + 1);
   }
@@ -81,7 +81,7 @@ function calculateNextDrawDate(now: Date) {
 }
 
 /**
- * Sincronização Proativa: Busca sequencialmente a partir do último salvo.
+ * Sincronização Sequencial: Busca o próximo número da fila até atualizar tudo.
  */
 export const syncLatestResults = async () => {
   try {
@@ -90,12 +90,11 @@ export const syncLatestResults = async () => {
     let count = 0;
     let lastSynced = lastNum;
 
-    // Tenta buscar o próximo número sequencialmente
-    // Fazemos um loop pequeno (max 5) para evitar travar se houver muitos atrasados
-    while (count < 5) {
+    // Busca sequencial agressiva (até 10 por vez para tirar o atraso)
+    while (count < 10) {
       const rawData = await fetchGuidiData(currentTarget);
       
-      // Se a API não retornou o concurso (ainda não sorteado ou erro)
+      // Se a API não retornou o concurso alvo, paramos a sequência
       if (!rawData || Number(rawData.numero) !== currentTarget) {
         break;
       }
@@ -112,10 +111,7 @@ export const syncLatestResults = async () => {
         .from('concursos')
         .upsert(processed, { onConflict: 'concurso' });
       
-      if (error) {
-        console.error(`[Sync Error] Falha no concurso ${currentTarget}:`, error.message);
-        break;
-      }
+      if (error) break;
 
       lastSynced = currentTarget;
       currentTarget++;
@@ -125,14 +121,13 @@ export const syncLatestResults = async () => {
     if (count > 0) {
       return { 
         success: true, 
-        message: `${count} novos concursos (até #${lastSynced}) sincronizados.`,
+        message: `${count} concurso(s) sincronizado(s) com sucesso.`,
         latest: lastSynced 
       };
     }
 
-    return { success: true, message: "Sistema já está na última versão disponível.", latest: lastNum };
+    return { success: true, message: "Base de dados atualizada.", latest: lastNum };
   } catch (error: any) {
-    console.error('[Sync Error Global]', error);
-    return { success: false, message: "Erro na rede de inteligência." };
+    return { success: false, message: "Falha na conexão com a rede de sorteios." };
   }
 };
