@@ -19,7 +19,8 @@ export default function Dashboard() {
     setSyncing(true);
     try {
       const res = await syncLatestResults();
-      if (!silent) toast.success(res.message);
+      if (!silent && res.success) toast.success(res.message);
+      if (!silent && !res.success) toast.error(res.message);
       await refresh(); 
     } catch (error) {
       if (!silent) toast.error("Erro ao sincronizar dados.");
@@ -28,24 +29,13 @@ export default function Dashboard() {
     }
   }, [syncing, refresh]);
 
-  // Auto-sync logic
+  // Sincronização Proativa: Tenta atualizar sempre que carregar se houver dados faltando
   useEffect(() => {
-    if (!loading && stats) {
-      const today = new Date();
-      const dayOfWeek = today.getDay(); // 0=Dom, 1=Seg... 6=Sab
-      const isDrawDay = dayOfWeek >= 1 && dayOfWeek <= 6;
-      
-      // Se for dia de sorteio e o último concurso for de ontem ou antes, tenta sincronizar
-      if (isDrawDay && stats.ultimoConcurso) {
-        const lastDate = new Date(stats.ultimoConcurso.data);
-        const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays >= 1 && today.getHours() >= 20) {
-          handleSync(true);
-        }
-      }
+    if (!loading) {
+      // Se não temos estatísticas ou o último concurso parece antigo, força uma sincronização silenciosa
+      handleSync(true);
     }
-  }, [loading, stats, handleSync]);
+  }, [loading, handleSync]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);

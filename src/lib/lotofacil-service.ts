@@ -24,6 +24,7 @@ async function fetchGuidiData(num?: number) {
 
 export const syncLatestResults = async () => {
   try {
+    // 1. Verifica o último concurso no banco
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -32,8 +33,9 @@ export const syncLatestResults = async () => {
       .maybeSingle();
 
     const lastNum = lastSaved?.concurso || 0;
-    const latestOnline = await fetchGuidiData();
     
+    // 2. Verifica o último na API
+    const latestOnline = await fetchGuidiData();
     if (!latestOnline) return { success: false, message: "API Guidi offline." };
 
     const targetNum = Number(latestOnline.numero);
@@ -42,8 +44,11 @@ export const syncLatestResults = async () => {
       return { success: true, message: "Dados já estão atualizados.", latest: lastNum };
     }
 
+    // 3. Define o ponto de partida (se o banco estiver vazio, pega apenas os últimos 50 para não travar)
+    const startNum = lastNum === 0 ? Math.max(1, targetNum - 50) : lastNum + 1;
+
     let count = 0;
-    for (let i = lastNum + 1; i <= targetNum; i++) {
+    for (let i = startNum; i <= targetNum; i++) {
       const rawData = await fetchGuidiData(i);
       if (!rawData) continue;
 
@@ -59,7 +64,11 @@ export const syncLatestResults = async () => {
         .from('concursos')
         .upsert(processed, { onConflict: 'concurso' });
       
-      if (!error) count++;
+      if (error) {
+        console.error(`[Sync Error] Falha no concurso ${i}:`, error.message);
+        continue;
+      }
+      count++;
     }
 
     return { 
@@ -68,7 +77,7 @@ export const syncLatestResults = async () => {
       latest: targetNum
     };
   } catch (error: any) {
-    console.error('[Sync Error]', error);
-    return { success: false, message: "Erro na sincronização." };
+    console.error('[Sync Error Global]', error);
+    return { success: false, message: "Erro crítico na sincronização." };
   }
 };
