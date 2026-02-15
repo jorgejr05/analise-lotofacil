@@ -3,20 +3,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
-export interface Concurso {
-  concurso: number;
-  data: string;
-  dezenas: number[];
-  soma: number;
-  pares: number;
-  impares: number;
-  repetidas_anterior?: number;
-  premiacao_json?: any;
-  valor_estimado?: number;
-}
-
 /**
- * Provedor 1: API Oficial da Caixa (Servidor)
+ * Provedor 1: API Oficial da Caixa (Direto)
  */
 async function fetchFromOfficial(num?: number) {
   try {
@@ -28,9 +16,9 @@ async function fetchFromOfficial(num?: number) {
       cache: 'no-store',
       headers: { 
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
-      },
-      next: { revalidate: 0 }
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      }
     });
     
     if (!response.ok) return null;
@@ -50,7 +38,7 @@ async function fetchFromOfficial(num?: number) {
 }
 
 /**
- * Provedor 2: Loterias API (Vercel - Alta Disponibilidade)
+ * Provedor 2: Loterias API (Vercel) - Geralmente o mais rápido a atualizar
  */
 async function fetchFromTertiary(num?: number) {
   try {
@@ -58,7 +46,7 @@ async function fetchFromTertiary(num?: number) {
       ? `https://loterias-api.vercel.app/api/lotofacil/${num}`
       : `https://loterias-api.vercel.app/api/lotofacil/latest`;
     
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
     if (!response.ok) return null;
     const data = await response.json();
     
@@ -76,18 +64,22 @@ async function fetchFromTertiary(num?: number) {
 }
 
 /**
- * Provedor 3: Heroku API (Fallback)
+ * Provedor 3: API Alternativa (Geralmente usada como fallback de segurança)
  */
-async function fetchFromSecondary(num?: number) {
+async function fetchFromQuaternary(num?: number) {
   try {
-    const url = num 
-      ? `https://loteriascaixa-api.herokuapp.com/api/lotofacil/${num}`
-      : `https://loteriascaixa-api.herokuapp.com/api/lotofacil/latest`;
-    
+    const url = `https://loteriascaixa-api.herokuapp.com/api/lotofacil/${num || 'latest'}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) return null;
     const data = await response.json();
-    return { ...data, source: 'secondary' };
+    return {
+      concurso: data.concurso || data.numero,
+      data: data.data,
+      dezenas: data.dezenas?.map(Number).sort((a: number, b: number) => a - b),
+      listaRateio: data.premiacoes || data.listaRateio,
+      valorEstimadoProximoConcurso: data.valorEstimadoProximoConcurso || 0,
+      source: 'quaternary'
+    };
   } catch (e) {
     return null;
   }
@@ -95,16 +87,19 @@ async function fetchFromSecondary(num?: number) {
 
 export const syncLatestResults = async () => {
   try {
-    // Tenta obter o número do último concurso de qualquer provedor
-    let latestRaw = await fetchFromOfficial();
-    if (!latestRaw) latestRaw = await fetchFromTertiary();
-    if (!latestRaw) latestRaw = await fetchFromSecondary();
+    console.log("[lotofacil-service] Iniciando sincronização profunda...");
     
-    if (!latestRaw) throw new Error("Todos os provedores de dados estão offline.");
+    // 1. Descobrir qual é o último concurso disponível no mundo
+    let latestRaw = await fetchFromTertiary(); 
+    if (!latestRaw) latestRaw = await fetchFromOfficial();
+    if (!latestRaw) latestRaw = await fetchFromQuaternary();
+    
+    if (!latestRaw) throw new Error("Não foi possível conectar a nenhum provedor de loterias.");
 
     const latestNum = Number(latestRaw.concurso);
+    console.log(`[lotofacil-service] Último concurso detectado: ${latestNum}`);
 
-    // Verifica o que já temos no banco
+    // 2. Verificar o último que temos no banco
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -112,45 +107,51 @@ export const syncLatestResults = async () => {
       .limit(1)
       .maybeSingle();
 
-    const startFrom = lastSaved ? Math.max(1, lastSaved.concurso - 2) : Math.max(1, latestNum - 5);
+    const startFrom = lastSaved ? Math.min(lastSaved.concurso, latestNum - 5) : latestNum - 10;
+    const finalStart = Math.max(1, startFrom);
 
     let count = 0;
-    // Loop para preencher lacunas
-    for (let i = startFrom; i <= latestNum; i++) {
-      try {
-        let data = await fetchFromOfficial(i);
-        if (!data) data = await fetchFromTertiary(i);
-        if (!data) data = await fetchFromSecondary(i);
-        
-        if (!data || !data.dezenas) continue;
+    
+    // 3. Loop de preenchimento
+    for (let i = finalStart; i <= latestNum; i++) {
+      let data = null;
+      
+      data = await fetchFromTertiary(i);
+      if (!data) data = await fetchFromOfficial(i);
+      if (!data) data = await fetchFromQuaternary(i);
+      
+      if (!data || !data.dezenas || data.dezenas.length !== 15) {
+        console.warn(`[lotofacil-service] Falha ao obter dados válidos para o concurso ${i}`);
+        continue;
+      }
 
-        const { data: anterior } = await supabase
-          .from('concursos')
-          .select('*')
-          .eq('concurso', i - 1)
-          .maybeSingle();
+      const { data: anterior } = await supabase
+        .from('concursos')
+        .select('*')
+        .eq('concurso', i - 1)
+        .maybeSingle();
 
-        const processed = processConcursoData(data, anterior || undefined);
-        
-        if (processed.dezenas && processed.dezenas.length === 15) {
-          const { error } = await supabase
-            .from('concursos')
-            .upsert(processed, { onConflict: 'concurso' });
-          
-          if (!error) count++;
-        }
-      } catch (err) {
-        console.warn(`[Sync] Erro no concurso ${i}:`, err);
+      const processed = processConcursoData(data, anterior || undefined);
+      
+      const { error } = await supabase
+        .from('concursos')
+        .upsert(processed, { onConflict: 'concurso' });
+      
+      if (!error) {
+        count++;
+        console.log(`[lotofacil-service] Concurso ${i} sincronizado com sucesso.`);
+      } else {
+        console.error(`[lotofacil-service] Erro ao salvar concurso ${i}:`, error);
       }
     }
 
     return { 
       success: true, 
-      message: count > 0 ? `Sincronizados ${count} novos resultados.` : "O sistema já está atualizado.",
+      message: count > 0 ? `Sincronizados ${count} resultados (Último: ${latestNum}).` : "O sistema já está em sincronia com os provedores.",
       latest: latestNum
     };
   } catch (error: any) {
-    console.error('[Sync Error]', error);
+    console.error('[lotofacil-service] Erro crítico na sincronização:', error);
     throw error;
   }
 };
