@@ -23,7 +23,7 @@ async function fetchGuidiData(num: number) {
 }
 
 /**
- * Calcula informações sobre o próximo sorteio esperado e detecta atrasos.
+ * Calcula informações sobre o estado da base de dados vs calendário oficial.
  */
 export async function getNextDrawInfo() {
   const { data: lastSaved } = await supabase
@@ -38,23 +38,20 @@ export async function getNextDrawInfo() {
   
   const now = new Date();
   const currentHour = now.getHours();
-  const currentDay = now.getDay();
+  const currentDay = now.getDay(); // 0=Dom, 1=Seg... 6=Sáb
 
-  // Lógica de detecção de atraso:
-  // Se o último salvo foi sexta (#3612) e hoje é domingo, o #3613 (sábado) está atrasado.
-  // Não esperamos segunda para buscar o #3613.
+  // Verifica se hoje é dia de sorteio (Seg-Sáb) e se já passou das 20h
+  const isDrawDay = currentDay >= 1 && currentDay <= 6;
+  const isAfterDrawTime = currentHour >= 20;
   
-  const nextDrawDate = calculateNextDrawDate(now);
-  
-  // Se a data atual já passou das 20h de um dia de sorteio, ou se estamos em um dia 
-  // posterior ao sorteio esperado do nextNum, estamos em "Atraso/Busca Ativa".
-  const isWaitingResult = (currentDay >= 1 && currentDay <= 6 && currentHour >= 20) || (currentDay === 0);
+  // Se já passou das 20h de um dia de sorteio, o nextNum já deveria estar disponível
+  const isPendingSync = isDrawDay && isAfterDrawTime;
 
   return {
     lastNum,
     nextNum,
-    isWaitingResult,
-    nextDrawDate
+    isPendingSync,
+    nextDrawDate: calculateNextDrawDate(now)
   };
 }
 
@@ -63,16 +60,11 @@ function calculateNextDrawDate(now: Date) {
   const hour = next.getHours();
   const day = next.getDay();
 
-  // Se for domingo, o próximo oficial é segunda
   if (day === 0) {
     next.setDate(next.getDate() + 1);
-  } 
-  // Se for sábado após as 20h, o próximo oficial é segunda
-  else if (day === 6 && hour >= 20) {
+  } else if (day === 6 && hour >= 20) {
     next.setDate(next.getDate() + 2);
-  }
-  // Se for dia de semana após as 20h, o próximo oficial é amanhã
-  else if (hour >= 20) {
+  } else if (hour >= 20) {
     next.setDate(next.getDate() + 1);
   }
   
@@ -81,7 +73,7 @@ function calculateNextDrawDate(now: Date) {
 }
 
 /**
- * Sincronização Sequencial: Busca o próximo número da fila até atualizar tudo.
+ * Sincronização Controlada: Busca apenas o necessário para atualizar a base.
  */
 export const syncLatestResults = async () => {
   try {
@@ -90,11 +82,10 @@ export const syncLatestResults = async () => {
     let count = 0;
     let lastSynced = lastNum;
 
-    // Busca sequencial agressiva (até 10 por vez para tirar o atraso)
-    while (count < 10) {
+    // Limite de segurança: busca no máximo 5 concursos por chamada
+    while (count < 5) {
       const rawData = await fetchGuidiData(currentTarget);
       
-      // Se a API não retornou o concurso alvo, paramos a sequência
       if (!rawData || Number(rawData.numero) !== currentTarget) {
         break;
       }
@@ -118,16 +109,12 @@ export const syncLatestResults = async () => {
       count++;
     }
 
-    if (count > 0) {
-      return { 
-        success: true, 
-        message: `${count} concurso(s) sincronizado(s) com sucesso.`,
-        latest: lastSynced 
-      };
-    }
-
-    return { success: true, message: "Base de dados atualizada.", latest: lastNum };
+    return { 
+      success: true, 
+      count,
+      latest: lastSynced 
+    };
   } catch (error: any) {
-    return { success: false, message: "Falha na conexão com a rede de sorteios." };
+    return { success: false, message: "Erro na rede." };
   }
 };

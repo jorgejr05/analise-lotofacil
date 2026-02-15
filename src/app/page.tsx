@@ -5,7 +5,7 @@ import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults, getNextDrawInfo } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2, Target, Calendar, AlertCircle } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2, Target, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -25,16 +25,25 @@ export default function Dashboard() {
     setSyncing(true);
     try {
       const res = await syncLatestResults();
-      if (!silent && res.success) toast.success(res.message);
+      if (!silent && res.success) {
+        // Verificação robusta para evitar erro de 'possibly undefined'
+        const count = (res as any).count ?? 0;
+        if (count > 0) {
+          toast.success(`${count} novo(s) concurso(s) adicionado(s).`);
+        } else {
+          toast.info("A base de dados já está atualizada.");
+        }
+      }
       await refresh(); 
       await loadNextDrawInfo();
     } catch (error) {
-      if (!silent) toast.error("Erro na sincronização.");
+      if (!silent) toast.error("Falha na sincronização.");
     } finally {
       setSyncing(false);
     }
   }, [syncing, refresh, loadNextDrawInfo]);
 
+  // Sincroniza apenas uma vez ao montar o componente
   useEffect(() => {
     if (!loading) {
       handleSync(true);
@@ -42,16 +51,11 @@ export default function Dashboard() {
     }
   }, [loading, handleSync, loadNextDrawInfo]);
 
+  // Apenas atualiza o relógio da UI
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(new Date());
-      // Tenta sincronizar a cada 30 segundos se estivermos esperando resultado
-      if (new Date().getSeconds() % 30 === 0 && nextDraw?.isWaitingResult) {
-        handleSync(true);
-      }
-    }, 1000);
+    const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
-  }, [nextDraw, handleSync]);
+  }, []);
 
   if (loading && !stats) {
     return (
@@ -73,20 +77,14 @@ export default function Dashboard() {
   const quentes = getTopNumbers(stats?.freqTotal, 10);
   const frios = getTopNumbers(stats?.freqTotal, 10, true);
 
-  const formatCurrency = (value: any) => {
-    const num = parseFloat(value);
-    if (isNaN(num) || num === 0) return "R$ ---";
-    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
   const getPrizeByHits = (hits: number) => {
-    if (hits === 11) return formatCurrency(7);
-    if (hits === 12) return formatCurrency(14);
-    if (hits === 13) return formatCurrency(35);
+    if (hits === 11) return "R$ 7,00";
+    if (hits === 12) return "R$ 14,00";
+    if (hits === 13) return "R$ 35,00";
     const premiacao = stats?.ultimoConcurso?.premiacao_json;
     if (!premiacao || !Array.isArray(premiacao)) return "R$ ---";
     const faixa = premiacao.find((p: any) => p.faixa === (16 - hits) || p.descricao?.includes(`${hits} acertos`));
-    return formatCurrency(faixa?.valor || 0);
+    return faixa?.valor ? faixa.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : "R$ ---";
   };
 
   return (
@@ -101,7 +99,7 @@ export default function Dashboard() {
             {syncing && (
               <div className="flex items-center gap-2 text-indigo-600 animate-pulse">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                <span className="text-[8px] font-black uppercase italic">Sincronizando...</span>
+                <span className="text-[8px] font-black uppercase italic">Processando...</span>
               </div>
             )}
           </div>
@@ -116,21 +114,21 @@ export default function Dashboard() {
               className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
             >
               <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
-              {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
+              {syncing ? 'Sincronizando...' : 'Sincronizar Base'}
             </Button>
 
             {nextDraw && (
               <div className={cn(
                 "flex items-center gap-3 px-5 py-3 rounded-2xl border-2 transition-all",
-                nextDraw.isWaitingResult 
-                  ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 animate-pulse" 
-                  : "bg-white border-slate-100 text-slate-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400"
+                nextDraw.isPendingSync 
+                  ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400" 
+                  : "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-900/10 dark:border-emerald-900/20 dark:text-emerald-400"
               )}>
-                {nextDraw.isWaitingResult ? <AlertCircle className="h-4 w-4 text-amber-500" /> : <Target className="h-4 w-4 text-slate-400" />}
+                {nextDraw.isPendingSync ? <AlertCircle className="h-4 w-4 text-amber-500" /> : <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
                 <div className="flex flex-col">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Alvo Sequencial</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest">Status do Alvo #{nextDraw.nextNum}</span>
                   <span className="text-[10px] font-black italic uppercase">
-                    #{nextDraw.nextNum} {nextDraw.isWaitingResult ? "• BUSCANDO NA API..." : `• PREVISTO: ${nextDraw.nextDrawDate.toLocaleDateString('pt-BR')} 20:00`}
+                    {nextDraw.isPendingSync ? "Sincronização Pendente" : "Aguardando Próximo Sorteio"}
                   </span>
                 </div>
               </div>
@@ -180,83 +178,64 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[3rem] blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
-              <Card className="relative border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900">
-                <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-8">
-                  <CardTitle className="flex justify-between items-center">
-                    <span className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Dezenas Sorteadas</span>
-                    <span className="bg-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">
-                      CONCURSO {stats?.ultimoConcurso?.concurso}
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-10">
-                  <div className="grid grid-cols-5 gap-3 md:flex md:flex-wrap md:justify-center">
-                    {stats?.ultimoConcurso?.dezenas.map((num: number) => (
-                      <div 
-                        key={num} 
-                        className="aspect-square w-full md:w-14 md:h-14 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-100 flex items-center justify-center font-black text-lg md:text-xl shadow-inner"
-                      >
-                        {num.toString().padStart(2, '0')}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900">
+              <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-8">
+                <CardTitle className="flex justify-between items-center">
+                  <span className="text-lg md:text-xl font-black italic uppercase tracking-tighter">Dezenas Sorteadas</span>
+                  <span className="bg-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">
+                    CONCURSO {stats?.ultimoConcurso?.concurso}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-10">
+                <div className="grid grid-cols-5 gap-3 md:flex md:flex-wrap md:justify-center">
+                  {stats?.ultimoConcurso?.dezenas.map((num: number) => (
+                    <div 
+                      key={num} 
+                      className="aspect-square w-full md:w-14 md:h-14 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-100 flex items-center justify-center font-black text-lg md:text-xl shadow-inner"
+                    >
+                      {num.toString().padStart(2, '0')}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900 transition-transform hover:scale-[1.01] duration-500">
+              <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900">
                 <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-6">
                   <CardTitle className="flex items-center gap-3">
-                    <div className="bg-orange-500 p-2 rounded-xl">
-                      <Flame className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Quentes</div>
-                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Top 10 Frequentes</div>
-                    </div>
+                    <Flame className="h-5 w-5 text-orange-500" />
+                    <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Quentes</div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     {quentes.map((item) => (
-                      <div key={item.num} className="flex flex-col items-center gap-2 group">
-                        <div className="w-12 h-12 rounded-xl bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-100 dark:border-orange-900/30 text-orange-700 dark:text-orange-400 flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-orange-500 group-hover:text-white transition-all duration-300">
+                      <div key={item.num} className="flex flex-col items-center gap-1">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 text-orange-700 dark:text-orange-400 flex items-center justify-center font-black text-sm">
                           {item.num.toString().padStart(2, '0')}
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter italic">
-                          {item.freq.toFixed(1).replace(/\.0$/, '')}%
-                        </span>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900 transition-transform hover:scale-[1.01] duration-500">
+              <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white dark:bg-slate-900">
                 <CardHeader className="bg-slate-900 dark:bg-slate-800 text-white p-6">
                   <CardTitle className="flex items-center gap-3">
-                    <div className="bg-indigo-500 p-2 rounded-xl">
-                      <Snowflake className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Frios</div>
-                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Top 10 Atrasados</div>
-                    </div>
+                    <Snowflake className="h-5 w-5 text-indigo-500" />
+                    <div className="text-sm font-black italic uppercase tracking-tighter">Tendência: Frios</div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     {frios.map((item) => (
-                      <div key={item.num} className="flex flex-col items-center gap-2 group">
-                        <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-100 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-400 flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300">
+                      <div key={item.num} className="flex flex-col items-center gap-1">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-400 flex items-center justify-center font-black text-sm">
                           {item.num.toString().padStart(2, '0')}
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter italic">
-                          {item.freq.toFixed(1).replace(/\.0$/, '')}%
-                        </span>
                       </div>
                     ))}
                   </div>
@@ -274,17 +253,12 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                 {[15, 14, 13, 12, 11].map((pts) => (
-                  <div key={pts} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 group hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                  <div key={pts} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{pts} Pontos</span>
-                      <span className="text-sm font-black text-slate-900 dark:text-slate-100 italic">
-                        {getPrizeByHits(pts)}
-                      </span>
+                      <span className="text-sm font-black text-slate-900 dark:text-slate-100 italic">{getPrizeByHits(pts)}</span>
                     </div>
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black",
-                      pts === 15 ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                    )}>
+                    <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black text-slate-500 dark:text-slate-400">
                       {pts}
                     </div>
                   </div>
