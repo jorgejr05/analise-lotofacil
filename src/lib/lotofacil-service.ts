@@ -5,7 +5,6 @@ import { processConcursoData } from "./lotofacil-utils";
 
 /**
  * Busca dados da Lotofácil exclusivamente via API Guidi.
- * @param num Número do concurso opcional. Se omitido, busca o último.
  */
 async function fetchGuidiData(num?: number) {
   try {
@@ -28,7 +27,7 @@ async function fetchGuidiData(num?: number) {
 
 export const syncLatestResults = async () => {
   try {
-    // 1. Identifica o último concurso registrado no banco de dados
+    // 1. Busca o último concurso no banco
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -38,26 +37,22 @@ export const syncLatestResults = async () => {
 
     const lastNum = lastSaved?.concurso || 0;
     
-    // 2. Verifica qual o último concurso disponível na API Guidi
+    // 2. Verifica o último na API
     const latestOnline = await fetchGuidiData();
-    if (!latestOnline) {
-      return { success: false, message: "Não foi possível conectar à API Guidi." };
-    }
+    if (!latestOnline) return { success: false, message: "API Guidi offline." };
 
     const targetNum = Number(latestOnline.numero);
     
-    // Se já estamos atualizados, encerra o processo
     if (targetNum <= lastNum) {
-      return { success: true, message: "O sistema já possui todos os dados atualizados.", latest: lastNum };
+      return { success: true, message: "Dados já estão atualizados.", latest: lastNum };
     }
 
     let count = 0;
-    // 3. Sincronização Incremental: processa apenas os novos concursos
+    // 3. Sincroniza apenas o que falta
     for (let i = lastNum + 1; i <= targetNum; i++) {
       const rawData = await fetchGuidiData(i);
       if (!rawData) continue;
 
-      // Busca o concurso anterior para calcular as dezenas repetidas
       const { data: anterior } = await supabase
         .from('concursos')
         .select('*')
@@ -75,11 +70,11 @@ export const syncLatestResults = async () => {
 
     return { 
       success: true, 
-      message: count > 0 ? `Sucesso: ${count} novos concursos sincronizados.` : "Sincronizado.",
+      message: count > 0 ? `${count} novos concursos sincronizados.` : "Sincronizado.",
       latest: targetNum
     };
   } catch (error: any) {
     console.error('[Sync Error]', error);
-    return { success: false, message: "Erro ao processar atualização incremental." };
+    return { success: false, message: "Erro na sincronização incremental." };
   }
 };
