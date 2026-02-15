@@ -3,6 +3,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
+/**
+ * Busca dados de um concurso específico ou o último disponível.
+ */
 async function fetchGuidiData(num?: number) {
   try {
     const url = num 
@@ -22,40 +25,85 @@ async function fetchGuidiData(num?: number) {
   }
 }
 
+/**
+ * Calcula informações sobre o próximo sorteio esperado.
+ */
+export async function getNextDrawInfo() {
+  const { data: lastSaved } = await supabase
+    .from('concursos')
+    .select('concurso, data')
+    .order('concurso', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lastNum = lastSaved?.concurso || 0;
+  const nextNum = lastNum + 1;
+  
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentDay = now.getDay(); // 0 = Domingo, 1 = Segunda... 6 = Sábado
+
+  // Lotofácil: Segunda (1) a Sábado (6) às 20h
+  const isDrawDay = currentDay >= 1 && currentDay <= 6;
+  const isAfterDrawTime = currentHour >= 20;
+  
+  // Se for dia de sorteio e já passou das 20h, estamos "em busca" do resultado
+  const isWaitingResult = isDrawDay && isAfterDrawTime;
+
+  return {
+    lastNum,
+    nextNum,
+    isWaitingResult,
+    nextDrawDate: calculateNextDrawDate(now)
+  };
+}
+
+function calculateNextDrawDate(now: Date) {
+  const next = new Date(now);
+  const hour = next.getHours();
+  const day = next.getDay();
+
+  // Se for domingo, o próximo é segunda
+  if (day === 0) {
+    next.setDate(next.getDate() + 1);
+  } 
+  // Se for sábado após as 20h, o próximo é segunda
+  else if (day === 6 && hour >= 20) {
+    next.setDate(next.getDate() + 2);
+  }
+  // Se for dia de semana após as 20h, o próximo é amanhã
+  else if (hour >= 20) {
+    next.setDate(next.getDate() + 1);
+  }
+  
+  next.setHours(20, 0, 0, 0);
+  return next;
+}
+
+/**
+ * Sincronização Proativa: Busca sequencialmente a partir do último salvo.
+ */
 export const syncLatestResults = async () => {
   try {
-    // 1. Verifica o último concurso no banco
-    const { data: lastSaved } = await supabase
-      .from('concursos')
-      .select('concurso')
-      .order('concurso', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const lastNum = lastSaved?.concurso || 0;
-    
-    // 2. Verifica o último na API
-    const latestOnline = await fetchGuidiData();
-    if (!latestOnline) return { success: false, message: "API Guidi offline." };
-
-    const targetNum = Number(latestOnline.numero);
-    
-    if (targetNum <= lastNum) {
-      return { success: true, message: "Dados já estão atualizados.", latest: lastNum };
-    }
-
-    // 3. Define o ponto de partida (se o banco estiver vazio, pega apenas os últimos 50 para não travar)
-    const startNum = lastNum === 0 ? Math.max(1, targetNum - 50) : lastNum + 1;
-
+    const { lastNum } = await getNextDrawInfo();
+    let currentTarget = lastNum + 1;
     let count = 0;
-    for (let i = startNum; i <= targetNum; i++) {
-      const rawData = await fetchGuidiData(i);
-      if (!rawData) continue;
+    let lastSynced = lastNum;
+
+    // Tenta buscar o próximo número sequencialmente
+    // Fazemos um loop pequeno (max 5) para evitar travar se houver muitos atrasados
+    while (count < 5) {
+      const rawData = await fetchGuidiData(currentTarget);
+      
+      // Se a API não retornou o concurso (ainda não sorteado ou erro)
+      if (!rawData || Number(rawData.numero) !== currentTarget) {
+        break;
+      }
 
       const { data: anterior } = await supabase
         .from('concursos')
         .select('*')
-        .eq('concurso', i - 1)
+        .eq('concurso', currentTarget - 1)
         .maybeSingle();
 
       const processed = processConcursoData(rawData, anterior || undefined);
@@ -65,19 +113,26 @@ export const syncLatestResults = async () => {
         .upsert(processed, { onConflict: 'concurso' });
       
       if (error) {
-        console.error(`[Sync Error] Falha no concurso ${i}:`, error.message);
-        continue;
+        console.error(`[Sync Error] Falha no concurso ${currentTarget}:`, error.message);
+        break;
       }
+
+      lastSynced = currentTarget;
+      currentTarget++;
       count++;
     }
 
-    return { 
-      success: true, 
-      message: count > 0 ? `${count} novos concursos sincronizados.` : "Sincronizado.",
-      latest: targetNum
-    };
+    if (count > 0) {
+      return { 
+        success: true, 
+        message: `${count} novos concursos (até #${lastSynced}) sincronizados.`,
+        latest: lastSynced 
+      };
+    }
+
+    return { success: true, message: "Sistema já está na última versão disponível.", latest: lastNum };
   } catch (error: any) {
     console.error('[Sync Error Global]', error);
-    return { success: false, message: "Erro crítico na sincronização." };
+    return { success: false, message: "Erro na rede de inteligência." };
   }
 };

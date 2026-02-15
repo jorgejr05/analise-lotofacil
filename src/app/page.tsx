@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
-import { syncLatestResults } from "@/lib/lotofacil-service";
+import { syncLatestResults, getNextDrawInfo } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2 } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2, Target, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -13,6 +13,12 @@ export default function Dashboard() {
   const { stats, loading, refresh } = useLotofacilStats();
   const [syncing, setSyncing] = useState(false);
   const [now, setNow] = useState(new Date());
+  const [nextDraw, setNextDraw] = useState<any>(null);
+
+  const loadNextDrawInfo = useCallback(async () => {
+    const info = await getNextDrawInfo();
+    setNextDraw(info);
+  }, []);
 
   const handleSync = useCallback(async (silent = false) => {
     if (syncing) return;
@@ -22,25 +28,31 @@ export default function Dashboard() {
       if (!silent && res.success) toast.success(res.message);
       if (!silent && !res.success) toast.error(res.message);
       await refresh(); 
+      await loadNextDrawInfo();
     } catch (error) {
       if (!silent) toast.error("Erro ao sincronizar dados.");
     } finally {
       setSyncing(false);
     }
-  }, [syncing, refresh]);
+  }, [syncing, refresh, loadNextDrawInfo]);
 
-  // Sincronização Proativa: Tenta atualizar sempre que carregar se houver dados faltando
   useEffect(() => {
     if (!loading) {
-      // Se não temos estatísticas ou o último concurso parece antigo, força uma sincronização silenciosa
       handleSync(true);
+      loadNextDrawInfo();
     }
-  }, [loading, handleSync]);
+  }, [loading, handleSync, loadNextDrawInfo]);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => {
+      setNow(new Date());
+      // A cada minuto, se estivermos em horário de sorteio, tenta sincronizar
+      if (new Date().getSeconds() === 0 && nextDraw?.isWaitingResult) {
+        handleSync(true);
+      }
+    }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [nextDraw, handleSync]);
 
   if (loading && !stats) {
     return (
@@ -99,14 +111,34 @@ export default function Dashboard() {
           <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tighter leading-none italic uppercase">
             Visão <span className="text-indigo-600">Geral</span>
           </h1>
-          <Button 
-            onClick={() => handleSync()} 
-            disabled={syncing}
-            className="w-fit mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
-          >
-            <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
-            {syncing ? 'Atualizando...' : 'Atualizar Resultados'}
-          </Button>
+          
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            <Button 
+              onClick={() => handleSync()} 
+              disabled={syncing}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
+            >
+              <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
+              {syncing ? 'Atualizando...' : 'Atualizar Resultados'}
+            </Button>
+
+            {nextDraw && (
+              <div className={cn(
+                "flex items-center gap-3 px-5 py-3 rounded-2xl border-2 transition-all",
+                nextDraw.isWaitingResult 
+                  ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 animate-pulse" 
+                  : "bg-white border-slate-100 text-slate-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400"
+              )}>
+                <Target className={cn("h-4 w-4", nextDraw.isWaitingResult ? "text-amber-500" : "text-slate-400")} />
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black uppercase tracking-widest">Próximo Alvo</span>
+                  <span className="text-[10px] font-black italic uppercase">
+                    #{nextDraw.nextNum} {nextDraw.isWaitingResult ? "• BUSCANDO RESULTADO..." : `• ${nextDraw.nextDrawDate.toLocaleDateString('pt-BR')} 20:00`}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
