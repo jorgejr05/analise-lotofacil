@@ -1,44 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
 import { syncLatestResults } from "@/lib/lotofacil-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Banknote, Trophy, Loader2 } from "lucide-react";
+import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDateTime } from "@/lib/utils";
-
-const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
-  if (!freqs) return [];
-  return Object.entries(freqs)
-    .map(([num, freq]) => ({ num: Number(num), freq }))
-    .sort((a, b) => ascending ? a.freq - b.freq : b.freq - a.freq)
-    .slice(0, count);
-};
 
 export default function Dashboard() {
   const { stats, loading, refresh } = useLotofacilStats();
   const [syncing, setSyncing] = useState(false);
   const [now, setNow] = useState(new Date());
 
+  const handleSync = useCallback(async (silent = false) => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await syncLatestResults();
+      if (!silent) toast.success(res.message);
+      await refresh(); 
+    } catch (error) {
+      if (!silent) toast.error("Erro ao sincronizar dados.");
+    } finally {
+      setSyncing(false);
+    }
+  }, [syncing, refresh]);
+
+  // Auto-sync logic
+  useEffect(() => {
+    if (!loading && stats) {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0=Dom, 1=Seg... 6=Sab
+      const isDrawDay = dayOfWeek >= 1 && dayOfWeek <= 6;
+      
+      // Se for dia de sorteio e o último concurso for de ontem ou antes, tenta sincronizar
+      if (isDrawDay && stats.ultimoConcurso) {
+        const lastDate = new Date(stats.ultimoConcurso.data);
+        const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays >= 1 && today.getHours() >= 20) {
+          handleSync(true);
+        }
+      }
+    }
+  }, [loading, stats, handleSync]);
+
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const res = await syncLatestResults();
-      toast.success(res.message);
-      await refresh(); 
-    } catch (error) {
-      toast.error("Erro ao sincronizar dados.");
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   if (loading && !stats) {
     return (
@@ -48,6 +60,14 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const getTopNumbers = (freqs: Record<number, number>, count: number, ascending = false) => {
+    if (!freqs) return [];
+    return Object.entries(freqs)
+      .map(([num, freq]) => ({ num: Number(num), freq }))
+      .sort((a, b) => ascending ? a.freq - b.freq : b.freq - a.freq)
+      .slice(0, count);
+  };
 
   const quentes = getTopNumbers(stats?.freqTotal, 10);
   const frios = getTopNumbers(stats?.freqTotal, 10, true);
@@ -59,7 +79,6 @@ export default function Dashboard() {
   };
 
   const getPrizeByHits = (hits: number) => {
-    // Fallback para prêmios fixos da Lotofácil conforme solicitado
     if (hits === 11) return formatCurrency(7);
     if (hits === 12) return formatCurrency(14);
     if (hits === 13) return formatCurrency(35);
@@ -91,7 +110,7 @@ export default function Dashboard() {
             Visão <span className="text-indigo-600">Geral</span>
           </h1>
           <Button 
-            onClick={handleSync} 
+            onClick={() => handleSync()} 
             disabled={syncing}
             className="w-fit mt-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-tr-2xl rounded-bl-2xl px-6 py-4 md:px-8 md:py-6 shadow-xl shadow-indigo-100 dark:shadow-indigo-900/20 transition-all font-black uppercase italic tracking-wider text-[10px] md:text-xs"
           >
