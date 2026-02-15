@@ -3,9 +3,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
-/**
- * Busca dados da Lotofácil exclusivamente via API Guidi.
- */
 async function fetchGuidiData(num?: number) {
   try {
     const url = num 
@@ -27,7 +24,6 @@ async function fetchGuidiData(num?: number) {
 
 export const syncLatestResults = async () => {
   try {
-    // 1. Busca o último concurso no banco
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -36,9 +32,8 @@ export const syncLatestResults = async () => {
       .maybeSingle();
 
     const lastNum = lastSaved?.concurso || 0;
-    
-    // 2. Verifica o último na API
     const latestOnline = await fetchGuidiData();
+    
     if (!latestOnline) return { success: false, message: "API Guidi offline." };
 
     const targetNum = Number(latestOnline.numero);
@@ -48,7 +43,6 @@ export const syncLatestResults = async () => {
     }
 
     let count = 0;
-    // 3. Sincroniza apenas o que falta
     for (let i = lastNum + 1; i <= targetNum; i++) {
       const rawData = await fetchGuidiData(i);
       if (!rawData) continue;
@@ -75,6 +69,6 @@ export const syncLatestResults = async () => {
     };
   } catch (error: any) {
     console.error('[Sync Error]', error);
-    return { success: false, message: "Erro na sincronização incremental." };
+    return { success: false, message: "Erro na sincronização." };
   }
 };

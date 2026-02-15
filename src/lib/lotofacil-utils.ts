@@ -5,14 +5,10 @@ export const calculatePoints = (jogoDezenas: number[], sorteioDezenas: number[])
   return j.filter(num => s.includes(num)).length;
 };
 
-/**
- * Processa os dados brutos da API Guidi para o formato do nosso banco de dados.
- * Baseado no JSON real: numero, dataApuracao, listaDezenas, listaRateioPremio.
- */
 export const processConcursoData = (data: any, anterior?: any) => {
   const dezenas = (data.listaDezenas || []).map((n: any) => Number(n)).sort((a: number, b: number) => a - b);
   const concursoNum = Number(data.numero);
-  const dataSorteio = data.dataApuracao; // "14/02/2026"
+  const dataSorteio = data.dataApuracao;
 
   const soma = dezenas.reduce((acc: number, curr: number) => acc + curr, 0);
   const pares = dezenas.filter((n: number) => n % 2 === 0).length;
@@ -24,7 +20,6 @@ export const processConcursoData = (data: any, anterior?: any) => {
     repetidas_anterior = dezenas.filter((n: number) => dezenasAnterior.includes(n)).length;
   }
 
-  // Mapeamento do Rateio conforme o JSON da Guidi
   const rawRateio = data.listaRateioPremio || [];
   const premiacao_json = rawRateio.map((p: any) => ({
     faixa: p.faixa,
@@ -33,7 +28,6 @@ export const processConcursoData = (data: any, anterior?: any) => {
     ganhadores: Number(p.numeroDeGanhadores || 0)
   }));
 
-  // Normalização de data (DD/MM/YYYY -> YYYY-MM-DD)
   let formattedDate = "2024-01-01";
   if (typeof dataSorteio === 'string' && dataSorteio.includes('/')) {
     const parts = dataSorteio.split('/');
