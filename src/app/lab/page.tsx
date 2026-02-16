@@ -12,7 +12,8 @@ import {
   Loader2, 
   Info, 
   TrendingUp,
-  Settings2
+  Settings2,
+  Trash2
 } from "lucide-react";
 import { 
   Select, 
@@ -31,6 +32,7 @@ import {
 export default function LabPage() {
   const [backtests, setBacktests] = useState<any[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testCount, setTestCount] = useState("100");
 
   const fetchBacktests = async () => {
@@ -98,6 +100,24 @@ export default function LabPage() {
       toast.error("Erro ao rodar backtest");
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleDeleteBacktest = async (id: string) => {
+    setDeletingId(id);
+    try {
+      // Primeiro deletamos os resultados vinculados (se houver restrição de FK)
+      await supabase.from('backtest_results').delete().eq('backtest_id', id);
+      
+      const { error } = await supabase.from('backtests').delete().eq('id', id);
+      if (error) throw error;
+      
+      setBacktests(prev => prev.filter(b => b.id !== id));
+      toast.success("Experimento removido.");
+    } catch (error: any) {
+      toast.error("Erro ao excluir: " + error.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -222,7 +242,7 @@ export default function LabPage() {
           <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 px-2">Histórico de Experimentos</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {backtests.map((bt) => (
-              <Card key={bt.id} className="border-none shadow-lg rounded-2xl bg-white dark:bg-slate-900 overflow-hidden hover:shadow-xl transition-shadow">
+              <Card key={bt.id} className="border-none shadow-lg rounded-2xl bg-white dark:bg-slate-900 overflow-hidden hover:shadow-xl transition-shadow group">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={cn(
@@ -236,8 +256,20 @@ export default function LabPage() {
                       <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">{bt.quantidade_concursos} Concursos • {new Date(bt.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 italic">
-                    {bt.status === 'processando' ? `${bt.progresso}%` : 'Finalizado'}
+                  
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 italic">
+                      {bt.status === 'processando' ? `${bt.progresso}%` : 'Finalizado'}
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleDeleteBacktest(bt.id)}
+                      disabled={deletingId === bt.id}
+                      className="h-8 w-8 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      {deletingId === bt.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
