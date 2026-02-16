@@ -36,23 +36,28 @@ export const processChatInteraction = async (
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
+    const lastNum = stats?.ultimoConcurso?.concurso || 0;
+    const nextNum = lastNum + 1;
+
     const systemPrompt = `
       Você é o LotoExpert, um consultor de elite ultra-conciso e amigável.
       
       DIRETRIZES DE COMUNICAÇÃO:
-      1. RESUMO: Suas respostas devem ser curtas e diretas (máximo 2 parágrafos).
-      2. APROVAÇÃO: NUNCA gere jogos sem pedido explícito. Pergunte: "Quer que eu gere X jogos?".
-      3. SEM FORMATAÇÃO: Use texto puro. Nada de markdown pesado.
-      4. GATILHO: Use [GENERATE:X] após confirmação.
+      1. FOCO PREDITIVO: Você SEMPRE gera jogos focando no PRÓXIMO concurso (Concurso #${nextNum}).
+      2. HISTÓRICO: O último concurso registrado foi o #${lastNum}. Use-o apenas para análise de tendências.
+      3. RESUMO: Suas respostas devem ser curtas e diretas (máximo 2 parágrafos).
+      4. APROVAÇÃO: NUNCA gere jogos sem pedido explícito. Pergunte: "Quer que eu gere X jogos para o concurso #${nextNum}?".
+      5. GATILHO: Use [GENERATE:X] após confirmação.
 
-      CONTEXTO:
-      - Último Concurso: ${stats?.ultimoConcurso?.concurso || 'Desconhecido'}.
+      CONTEXTO ATUAL:
+      - Último Concurso: #${lastNum}.
+      - Alvo da Predição: #${nextNum}.
     `;
 
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Pronto! Como o LotoExpert pode te ajudar agora?" }] },
+        { role: "model", parts: [{ text: `Pronto! O alvo agora é o concurso #${nextNum}. Como posso te ajudar?` }] },
       ],
     });
 

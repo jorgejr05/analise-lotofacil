@@ -30,6 +30,8 @@ export default function GeneratorPage() {
   const [selectedPool, setSelectedPool] = useState<number[]>([]);
   const [isRealBet, setIsRealBet] = useState(false);
 
+  const nextContestNum = stats?.ultimoConcurso?.concurso ? stats.ultimoConcurso.concurso + 1 : 0;
+
   useEffect(() => {
     if (stats && selectedPool.length === 0) {
       const top20 = Object.entries(stats.freqTotal)
@@ -88,29 +90,28 @@ export default function GeneratorPage() {
       setGeneratedGames(games);
       const aiInsight = await generateGameInsight(stats, games, mode, user.id);
       setInsight(aiInsight);
-      toast.success(`${finalQty} jogos gerados com sucesso!`);
+      toast.success(`${finalQty} jogos gerados para o concurso #${nextContestNum}!`);
     } catch (error) {
       toast.error("Falha ao simular jogos");
     } finally {
       setIsGenerating(false);
     }
-  }, [stats, quantity, mode, selectedPool, user]);
+  }, [stats, quantity, mode, selectedPool, user, nextContestNum]);
 
   const handleSaveGames = async () => {
     if (generatedGames.length === 0 || !user) return;
     setIsSaving(true);
     try {
       const valorTotal = generatedGames.length * 3.5;
-      const concursoId = stats.ultimoConcurso.concurso;
-
+      
       const gamesToSave = generatedGames.map(dezenas => ({
         user_id: user.id,
         dezenas,
-        concurso_referencia: concursoId
+        concurso_referencia: nextContestNum
       }));
       await supabase.from('jogos').insert(gamesToSave);
 
-      await registerBet(user.id, concursoId, valorTotal, !isRealBet);
+      await registerBet(user.id, nextContestNum, valorTotal, !isRealBet);
 
       toast.success(isRealBet ? "Aposta REAL registrada na banca!" : "Aposta SIMULADA registrada!");
       setGeneratedGames([]);
@@ -128,7 +129,7 @@ export default function GeneratorPage() {
       <div className="p-5 md:p-10 max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start gap-4">
           <div className="space-y-1">
-            <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Caçada ao Prêmio Máximo</span>
+            <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase italic">Alvo: Concurso #{nextContestNum}</span>
             <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tighter uppercase italic leading-none">
               Motor de <span className="text-indigo-600">Alta Precisão</span>
             </h1>
@@ -159,7 +160,7 @@ export default function GeneratorPage() {
                     <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                       <Target className="h-4 w-4" /> Seletor de Grupo (Pool)
                     </CardTitle>
-                    <p className="text-[9px] font-bold text-emerald-600/70 dark:text-emerald-500/70 uppercase">Escolha as dezenas que o sistema irá desdobrar</p>
+                    <p className="text-[9px] font-bold text-emerald-600/70 dark:text-emerald-500/70 uppercase">Escolha as dezenas para o concurso #{nextContestNum}</p>
                   </div>
                   <Button 
                     onClick={handleIASuggestion} 
@@ -221,14 +222,14 @@ export default function GeneratorPage() {
                     <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
                       <Cpu className="h-8 w-8 text-slate-200 dark:text-slate-700" />
                     </div>
-                    <p className="text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase italic tracking-widest">Aguardando comando de processamento...</p>
+                    <p className="text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase italic tracking-widest">Aguardando comando para o concurso #{nextContestNum}...</p>
                   </div>
                 ) : (
                   <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {generatedGames.map((game, idx) => (
                         <div key={idx} className="p-5 bg-slate-50/50 dark:bg-slate-800/50 rounded-[1.5rem] border border-slate-100/50 dark:border-slate-700/50 relative group">
-                          <div className="absolute -top-2 -left-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-lg text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase shadow-sm">Jogo {idx + 1} (15 Dezenas)</div>
+                          <div className="absolute -top-2 -left-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-lg text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase shadow-sm">Jogo {idx + 1} (Alvo #{nextContestNum})</div>
                           <div className="grid grid-cols-5 gap-2 mt-2">
                             {game.map(num => (
                               <span key={num} className="aspect-square flex items-center justify-center bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
