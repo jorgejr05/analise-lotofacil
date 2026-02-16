@@ -8,16 +8,20 @@ import { processConcursoData } from "./lotofacil-utils";
  */
 async function fetchGuidiData(num: number) {
   try {
-    const url = `https://api.guidi.dev.br/loteria/lotofacil/${num}`;
+    // Adicionamos um timestamp para evitar cache agressivo de provedores
+    const url = `https://api.guidi.dev.br/loteria/lotofacil/${num}?t=${Date.now()}`;
     const res = await fetch(url, { 
       cache: 'no-store',
-      headers: { 'Accept': 'application/json' }
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'LotoExpert-App'
+      }
     });
     
     if (!res.ok) return null;
     const data = await res.json();
     
-    // Validação básica para garantir que recebemos um concurso válido
+    // Validação rigorosa: a API Guidi retorna o número do concurso no campo 'numero'
     if (!data || !data.numero || !data.listaDezenas) return null;
     
     return data;
@@ -44,22 +48,18 @@ export async function getNextDrawInfo() {
   const now = new Date();
   const currentHour = now.getHours();
   
-  // Data do último sorteio que DEVERIA ter acontecido
+  // Data do último sorteio que DEVERIA ter acontecido (Seg-Sáb 20h)
   const lastExpectedDraw = new Date();
   if (currentHour < 20) {
     lastExpectedDraw.setDate(lastExpectedDraw.getDate() - 1);
   }
-  // Se for domingo, o último esperado foi sábado
-  if (lastExpectedDraw.getDay() === 0) {
+  if (lastExpectedDraw.getDay() === 0) { // Domingo não tem sorteio
     lastExpectedDraw.setDate(lastExpectedDraw.getDate() - 1);
   }
   lastExpectedDraw.setHours(20, 0, 0, 0);
 
-  // Se o último concurso salvo no banco tem uma data anterior ao último sorteio esperado,
-  // ou se o número sequencial sugere que falta algo, marcamos como pendente.
   const lastSavedDate = lastSaved?.data ? new Date(lastSaved.data + 'T20:00:00') : new Date(0);
-  
-  const isPendingSync = lastSavedDate < lastExpectedDraw || (now.getDay() !== 0 && currentHour >= 20);
+  const isPendingSync = lastSavedDate < lastExpectedDraw;
 
   return {
     lastNum,
@@ -87,7 +87,7 @@ function calculateNextDrawDate(now: Date) {
 }
 
 /**
- * Sincronização Forçada: Tenta buscar o próximo concurso independente de flags.
+ * Sincronização Forçada: Tenta buscar o próximo concurso.
  */
 export const syncLatestResults = async () => {
   try {
@@ -103,11 +103,14 @@ export const syncLatestResults = async () => {
     let count = 0;
     let lastSynced = lastNum;
 
-    // Busca até 5 concursos por vez para tirar o atraso
+    // Busca sequencial para garantir que não pulamos nenhum concurso
     while (count < 5) {
       const rawData = await fetchGuidiData(currentTarget);
       
-      if (!rawData) break;
+      if (!rawData) {
+        console.log(`[Sync] Concurso ${currentTarget} ainda não disponível na API.`);
+        break;
+      }
 
       const { data: anterior } = await supabase
         .from('concursos')
@@ -122,8 +125,8 @@ export const syncLatestResults = async () => {
         .upsert(processed, { onConflict: 'concurso' });
       
       if (error) {
-        console.error("[Sync Error] Upsert failed:", error);
-        break;
+        console.error("[Sync Error] Falha de RLS ou Banco:", error.message);
+        return { success: false, message: error.message };
       }
 
       lastSynced = currentTarget;
@@ -137,7 +140,7 @@ export const syncLatestResults = async () => {
       latest: lastSynced 
     };
   } catch (error: any) {
-    console.error("[Sync Error] Global failure:", error);
-    return { success: false, message: "Erro na rede." };
+    console.error("[Sync Error] Falha crítica:", error);
+    return { success: false, message: "Erro de conexão." };
   }
 };
