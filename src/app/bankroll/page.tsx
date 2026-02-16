@@ -15,9 +15,7 @@ import {
   Target,
   BarChart3,
   Settings2,
-  Loader2,
-  ChevronDown,
-  ChevronUp
+  Loader2
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -41,10 +39,14 @@ export default function BankrollPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const loadData = async () => {
-    if (user) {
+    if (!user) return;
+    try {
       const data = await getBankrollStats(user.id);
       setStats(data);
       setNewInitial(data.initialBankroll.toString());
+    } catch (error) {
+      console.error("Erro ao carregar dados da banca:", error);
+    } finally {
       setLoading(false);
     }
   };
@@ -55,15 +57,23 @@ export default function BankrollPage() {
 
   const handleUpdateInitial = async () => {
     if (!user || !newInitial) return;
+    const amount = parseFloat(newInitial);
+    if (isNaN(amount)) {
+      toast.error("Por favor, insira um valor numérico válido.");
+      return;
+    }
+
     setUpdating(true);
     try {
-      const { error } = await updateBankrollSettings(user.id, parseFloat(newInitial));
-      if (error) throw error;
-      toast.success("Banca inicial atualizada!");
+      const result = await updateBankrollSettings(user.id, amount);
+      if (result.error) throw new Error(result.error);
+      
+      toast.success("Capital inicial atualizado com sucesso!");
       setIsDialogOpen(false);
+      // Forçamos o recarregamento completo dos dados
       await loadData();
-    } catch (error) {
-      toast.error("Erro ao atualizar banca.");
+    } catch (error: any) {
+      toast.error("Erro ao atualizar banca: " + error.message);
     } finally {
       setUpdating(false);
     }
@@ -120,6 +130,7 @@ export default function BankrollPage() {
                     type="number" 
                     value={newInitial} 
                     onChange={(e) => setNewInitial(e.target.value)}
+                    placeholder="Ex: 2000"
                     className="h-12 rounded-xl border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-slate-900 dark:text-slate-100"
                   />
                 </div>
