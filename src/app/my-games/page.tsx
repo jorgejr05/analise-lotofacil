@@ -10,7 +10,9 @@ import {
   Calendar, 
   Sparkles, 
   CheckCircle2,
-  Wallet
+  Wallet,
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { 
   Select, 
@@ -23,44 +25,61 @@ import { cn } from "@/lib/utils";
 import { calculatePoints } from "@/lib/lotofacil-utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function MyGamesPage() {
   const [jogos, setJogos] = useState<any[]>([]);
   const [concursos, setConcursos] = useState<any[]>([]);
   const [selectedConcurso, setSelectedConcurso] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const { data: gamesData } = await supabase
+      .from('jogos')
+      .select('*')
+      .order('criado_em', { ascending: false });
+
+    const { data: contestsData } = await supabase
+      .from('concursos')
+      .select('concurso, dezenas, data')
+      .order('concurso', { ascending: false })
+      .limit(20);
+
+    if (gamesData) setJogos(gamesData);
+    if (contestsData) {
+      setConcursos(contestsData);
+      setSelectedConcurso(contestsData[0]?.concurso.toString());
+    }
+    
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: gamesData } = await supabase
-        .from('jogos')
-        .select('*')
-        .order('criado_em', { ascending: false });
-
-      const { data: contestsData } = await supabase
-        .from('concursos')
-        .select('concurso, dezenas, data')
-        .order('concurso', { ascending: false })
-        .limit(20);
-
-      if (gamesData) setJogos(gamesData);
-      if (contestsData) {
-        setConcursos(contestsData);
-        setSelectedConcurso(contestsData[0]?.concurso.toString());
-      }
-      
-      setLoading(false);
-    };
-
     fetchData();
   }, []);
+
+  const handleDeleteGame = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const { error } = await supabase.from('jogos').delete().eq('id', id);
+      if (error) throw error;
+      
+      setJogos(prev => prev.filter(j => j.id !== id));
+      toast.success("Jogo removido da sua base.");
+    } catch (error: any) {
+      toast.error("Erro ao deletar: " + error.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const currentContestData = concursos.find(c => c.concurso.toString() === selectedConcurso);
 
@@ -138,7 +157,7 @@ export default function MyGamesPage() {
                 <Card 
                   key={jogo.id} 
                   className={cn(
-                    "border-none shadow-xl overflow-hidden bg-white dark:bg-slate-900 group transition-all duration-500 hover:scale-[1.01]",
+                    "border-none shadow-xl overflow-hidden bg-white dark:bg-slate-900 group transition-all duration-500 hover:scale-[1.01] relative",
                     idx % 2 === 0 ? "rounded-tl-[3rem] rounded-br-[3rem]" : "rounded-tr-[3rem] rounded-bl-[3rem]"
                   )}
                 >
@@ -154,7 +173,7 @@ export default function MyGamesPage() {
                       {isWinner && <Trophy className="h-6 w-6 animate-bounce" />}
                     </div>
 
-                    <CardContent className="flex-1 p-8 space-y-6">
+                    <CardContent className="flex-1 p-8 space-y-6 relative">
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <Badge variant="outline" className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 font-black italic rounded-lg">
@@ -167,8 +186,20 @@ export default function MyGamesPage() {
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] font-black uppercase text-slate-300 dark:text-slate-600 italic">
-                          ID: {jogo.id.slice(0, 8)}
+                        
+                        <div className="flex items-center gap-2">
+                          <div className="text-[10px] font-black uppercase text-slate-300 dark:text-slate-600 italic hidden md:block">
+                            ID: {jogo.id.slice(0, 8)}
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteGame(jogo.id)}
+                            disabled={deletingId === jogo.id}
+                            className="h-8 w-8 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                          >
+                            {deletingId === jogo.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
                         </div>
                       </div>
 
