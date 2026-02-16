@@ -3,7 +3,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const getBankrollStats = async (userId: string) => {
-  // Ensure user has bankroll settings
+  // Garante que o usuário tenha configurações de banca
   let { data: settings } = await supabase
     .from('user_bankroll_settings')
     .select('*')
@@ -42,13 +42,14 @@ export const getBankrollStats = async (userId: string) => {
   const totalPremiado = history.reduce((acc, curr) => acc + Number(curr.valor_premiado), 0);
   const roiGeral = totalApostado > 0 ? ((totalPremiado - totalApostado) / totalApostado) * 100 : 0;
 
-  // Max Drawdown Calculation
+  // Cálculo de Max Drawdown e Curva de Equidade
   let peak = Number(settings?.bankroll_inicial || 1000);
   let current = peak;
   let maxDD = 0;
 
   history.forEach(h => {
-    current += Number(h.lucro_prejuizo);
+    const lp = Number(h.lucro_prejuizo || (Number(h.valor_premiado) - Number(h.valor_apostado)));
+    current += lp;
     if (current > peak) peak = current;
     const dd = peak - current;
     if (dd > maxDD) maxDD = dd;
@@ -67,12 +68,16 @@ export const getBankrollStats = async (userId: string) => {
 };
 
 export const updateBankrollSettings = async (userId: string, initialAmount: number) => {
+  // Busca o histórico para recalcular o saldo atual baseado no novo aporte inicial
   const { data: history } = await supabase
     .from('bankroll_history')
-    .select('lucro_prejuizo')
+    .select('valor_apostado, valor_premiado')
     .eq('user_id', userId);
   
-  const totalProfitLoss = history?.reduce((acc, curr) => acc + Number(curr.lucro_prejuizo), 0) || 0;
+  const totalProfitLoss = history?.reduce((acc, curr) => {
+    return acc + (Number(curr.valor_premiado) - Number(curr.valor_apostado));
+  }, 0) || 0;
+
   const newCurrentBalance = initialAmount + totalProfitLoss;
 
   const { error } = await supabase
@@ -95,17 +100,20 @@ export const registerBet = async (userId: string, concursoId: number, valorApost
     .single();
 
   const bankrollAntes = Number(settings?.bankroll_atual || 1000);
+  const lucroPrejuizo = -valorApostado; // Inicialmente é prejuízo (custo da aposta)
+  const roi = -100; // ROI inicial de -100% (perda total até o sorteio)
 
   const { error } = await supabase.from('bankroll_history').insert({
     user_id: userId,
     concurso_id: concursoId,
     valor_apostado: valorApostado,
     valor_premiado: 0,
+    lucro_prejuizo: lucroPrejuizo,
+    roi_percentual: roi,
     bankroll_snapshot: bankrollAntes,
     is_simulado: isSimulado
   });
 
-  // Always update current bankroll for real or simulated if you want it tracked
   if (!error) {
     await supabase
       .from('user_bankroll_settings')

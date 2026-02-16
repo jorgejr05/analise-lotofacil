@@ -38,6 +38,7 @@ export default function BankrollPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [newInitial, setNewInitial] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const loadData = async () => {
     if (user) {
@@ -59,6 +60,7 @@ export default function BankrollPage() {
       const { error } = await updateBankrollSettings(user.id, parseFloat(newInitial));
       if (error) throw error;
       toast.success("Banca inicial atualizada!");
+      setIsDialogOpen(false);
       await loadData();
     } catch (error) {
       toast.error("Erro ao atualizar banca.");
@@ -81,7 +83,8 @@ export default function BankrollPage() {
   const chartData = stats.history.map((h: any, idx: number) => {
     let balance = stats.initialBankroll;
     for (let i = 0; i <= idx; i++) {
-      balance += (Number(stats.history[i].valor_premiado) - Number(stats.history[i].valor_apostado));
+      const lp = Number(stats.history[i].lucro_prejuizo || (Number(stats.history[i].valor_premiado) - Number(stats.history[i].valor_apostado)));
+      balance += lp;
     }
     return {
       name: `C${h.concurso_id}`,
@@ -100,7 +103,7 @@ export default function BankrollPage() {
             </h1>
           </div>
 
-          <Dialog>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="rounded-xl border-2 border-slate-100 dark:border-slate-800 font-black uppercase italic text-[10px] tracking-widest h-11 text-slate-900 dark:text-slate-100">
                 <Settings2 className="h-4 w-4 mr-2" /> Ajustar Capital
