@@ -25,15 +25,15 @@ export default function Dashboard() {
     setSyncing(true);
     try {
       const res = await syncLatestResults();
-      if (!silent && res.success) {
+      if (res.success) {
         const count = (res as any).count ?? 0;
         if (count > 0) {
-          toast.success(`${count} novo(s) concurso(s) sincronizado(s)!`);
-        } else {
-          toast.info("Nenhum resultado novo disponível na API ainda.");
+          if (!silent) toast.success(`${count} novo(s) concurso(s) sincronizado(s)!`);
+          await refresh(); 
+        } else if (!silent) {
+          toast.info("Nenhum resultado novo encontrado na API.");
         }
       }
-      await refresh(); 
       await loadNextDrawInfo();
     } catch (error) {
       if (!silent) toast.error("Falha na sincronização com a API.");
@@ -42,14 +42,12 @@ export default function Dashboard() {
     }
   }, [syncing, refresh, loadNextDrawInfo]);
 
-  // Carga inicial de informações
   useEffect(() => {
     if (!loading) {
       loadNextDrawInfo();
     }
   }, [loading, loadNextDrawInfo]);
 
-  // Relógio da UI
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);

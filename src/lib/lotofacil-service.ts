@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
 /**
- * Busca dados de um concurso específico.
+ * Busca dados de um concurso específico na API Guidi.
  */
 async function fetchGuidiData(num: number) {
   try {
@@ -15,7 +15,12 @@ async function fetchGuidiData(num: number) {
     });
     
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    
+    // Validação básica para garantir que recebemos um concurso válido
+    if (!data || !data.numero || !data.listaDezenas) return null;
+    
+    return data;
   } catch (error) {
     console.error(`[Guidi API Error] Concurso ${num}:`, error);
     return null;
@@ -23,7 +28,7 @@ async function fetchGuidiData(num: number) {
 }
 
 /**
- * Calcula informações sobre o estado da base de dados vs calendário oficial.
+ * Determina se há concursos pendentes comparando o banco com o calendário.
  */
 export async function getNextDrawInfo() {
   const { data: lastSaved } = await supabase
@@ -38,14 +43,23 @@ export async function getNextDrawInfo() {
   
   const now = new Date();
   const currentHour = now.getHours();
-  const currentDay = now.getDay(); // 0=Dom, 1=Seg... 6=Sáb
-
-  // Verifica se hoje é dia de sorteio (Seg-Sáb) e se já passou das 20h
-  const isDrawDay = currentDay >= 1 && currentDay <= 6;
-  const isAfterDrawTime = currentHour >= 20;
   
-  // Se já passou das 20h de um dia de sorteio, o nextNum já deveria estar disponível
-  const isPendingSync = isDrawDay && isAfterDrawTime;
+  // Data do último sorteio que DEVERIA ter acontecido
+  const lastExpectedDraw = new Date();
+  if (currentHour < 20) {
+    lastExpectedDraw.setDate(lastExpectedDraw.getDate() - 1);
+  }
+  // Se for domingo, o último esperado foi sábado
+  if (lastExpectedDraw.getDay() === 0) {
+    lastExpectedDraw.setDate(lastExpectedDraw.getDate() - 1);
+  }
+  lastExpectedDraw.setHours(20, 0, 0, 0);
+
+  // Se o último concurso salvo no banco tem uma data anterior ao último sorteio esperado,
+  // ou se o número sequencial sugere que falta algo, marcamos como pendente.
+  const lastSavedDate = lastSaved?.data ? new Date(lastSaved.data + 'T20:00:00') : new Date(0);
+  
+  const isPendingSync = lastSavedDate < lastExpectedDraw || (now.getDay() !== 0 && currentHour >= 20);
 
   return {
     lastNum,
@@ -73,22 +87,27 @@ function calculateNextDrawDate(now: Date) {
 }
 
 /**
- * Sincronização Controlada: Busca apenas o necessário para atualizar a base.
+ * Sincronização Forçada: Tenta buscar o próximo concurso independente de flags.
  */
 export const syncLatestResults = async () => {
   try {
-    const { lastNum } = await getNextDrawInfo();
+    const { data: lastSaved } = await supabase
+      .from('concursos')
+      .select('concurso')
+      .order('concurso', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const lastNum = lastSaved?.concurso || 0;
     let currentTarget = lastNum + 1;
     let count = 0;
     let lastSynced = lastNum;
 
-    // Limite de segurança: busca no máximo 5 concursos por chamada
+    // Busca até 5 concursos por vez para tirar o atraso
     while (count < 5) {
       const rawData = await fetchGuidiData(currentTarget);
       
-      if (!rawData || Number(rawData.numero) !== currentTarget) {
-        break;
-      }
+      if (!rawData) break;
 
       const { data: anterior } = await supabase
         .from('concursos')
@@ -102,7 +121,10 @@ export const syncLatestResults = async () => {
         .from('concursos')
         .upsert(processed, { onConflict: 'concurso' });
       
-      if (error) break;
+      if (error) {
+        console.error("[Sync Error] Upsert failed:", error);
+        break;
+      }
 
       lastSynced = currentTarget;
       currentTarget++;
@@ -115,6 +137,7 @@ export const syncLatestResults = async () => {
       latest: lastSynced 
     };
   } catch (error: any) {
+    console.error("[Sync Error] Global failure:", error);
     return { success: false, message: "Erro na rede." };
   }
 };
