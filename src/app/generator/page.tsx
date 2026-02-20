@@ -109,14 +109,20 @@ export default function GeneratorPage() {
         dezenas,
         concurso_referencia: nextContestNum
       }));
-      await supabase.from('jogos').insert(gamesToSave);
 
-      await registerBet(user.id, nextContestNum, valorTotal, !isRealBet);
+      // Registro dos jogos
+      const { error: insertError } = await supabase.from('jogos').insert(gamesToSave);
+      if (insertError) throw insertError;
+
+      // Registro financeiro
+      const financeResult = await registerBet(user.id, nextContestNum, valorTotal, !isRealBet);
+      if (!financeResult.success) throw new Error(financeResult.error);
 
       toast.success(isRealBet ? "Aposta REAL registrada na banca!" : "Aposta SIMULADA registrada!");
       setGeneratedGames([]);
-    } catch (error) {
-      toast.error("Erro ao salvar");
+    } catch (error: any) {
+      console.error("Erro ao salvar jogos:", error);
+      toast.error("Erro ao salvar: " + (error.message || "Erro desconhecido"));
     } finally {
       setIsSaving(false);
     }

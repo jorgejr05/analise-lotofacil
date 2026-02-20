@@ -1,5 +1,3 @@
-"use server";
-
 import { supabase } from "@/integrations/supabase/client";
 
 export const getBankrollStats = async (userId: string) => {
@@ -97,31 +95,38 @@ export const updateBankrollSettings = async (userId: string, initialAmount: numb
 };
 
 export const registerBet = async (userId: string, concursoId: number, valorApostado: number, isSimulado: boolean = true) => {
-  const { data: settings } = await supabase
-    .from('user_bankroll_settings')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+  try {
+    const { data: settings } = await supabase
+      .from('user_bankroll_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-  const bankrollAntes = Number(settings?.bankroll_atual || 1000);
-  
-  const { error } = await supabase.from('bankroll_history').insert({
-    user_id: userId,
-    concurso_id: concursoId,
-    valor_apostado: valorApostado,
-    valor_premiado: 0,
-    lucro_prejuizo: -valorApostado,
-    roi_percentual: -100,
-    bankroll_snapshot: bankrollAntes,
-    is_simulado: isSimulado
-  });
+    const bankrollAntes = Number(settings?.bankroll_atual || 1000);
+    
+    const { error: historyError } = await supabase.from('bankroll_history').insert({
+      user_id: userId,
+      concurso_id: concursoId,
+      valor_apostado: valorApostado,
+      valor_premiado: 0,
+      lucro_prejuizo: -valorApostado,
+      roi_percentual: -100,
+      bankroll_snapshot: bankrollAntes,
+      is_simulado: isSimulado
+    });
 
-  if (!error) {
-    await supabase
+    if (historyError) throw historyError;
+
+    const { error: updateError } = await supabase
       .from('user_bankroll_settings')
       .update({ bankroll_atual: bankrollAntes - valorApostado })
       .eq('user_id', userId);
+
+    if (updateError) throw updateError;
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Finance] Erro ao registrar aposta:", error);
+    return { success: false, error: error.message };
   }
-  
-  return { error };
 };
