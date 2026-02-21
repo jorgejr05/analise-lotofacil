@@ -12,7 +12,10 @@ import {
   CheckCircle2,
   Wallet,
   Trash2,
-  Loader2
+  Loader2,
+  BrainCircuit,
+  Layers,
+  MousePointer2
 } from "lucide-react";
 import { 
   Select, 
@@ -91,6 +94,28 @@ export default function MyGamesPage() {
       </div>
     );
   }
+
+  const getMethodBadge = (metodo: string) => {
+    if (metodo === 'IA Preditiva') {
+      return (
+        <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 font-black italic rounded-lg gap-1 px-3">
+          <BrainCircuit className="h-3 w-3" /> IA Preditiva
+        </Badge>
+      );
+    }
+    if (metodo === 'Fechamento') {
+      return (
+        <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 font-black italic rounded-lg gap-1 px-3">
+          <Layers className="h-3 w-3" /> Fechamento
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-slate-400 dark:text-slate-500 font-black italic rounded-lg gap-1 px-3">
+        <MousePointer2 className="h-3 w-3" /> Manual
+      </Badge>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 md:pl-64 pb-32 transition-colors">
@@ -176,21 +201,13 @@ export default function MyGamesPage() {
                     <CardContent className="flex-1 p-8 space-y-6 relative">
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 font-black italic rounded-lg">
-                            CRIADO EM {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
+                          {getMethodBadge(jogo.metodo)}
+                          <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-800 font-black italic rounded-lg">
+                            {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
                           </Badge>
-                          {currentContestData && (
-                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center">
-                              <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" /> 
-                              Comparando com #{currentContestData.concurso}
-                            </span>
-                          )}
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          <div className="text-[10px] font-black uppercase text-slate-300 dark:text-slate-600 italic hidden md:block">
-                            ID: {jogo.id.slice(0, 8)}
-                          </div>
                           <Button 
                             variant="ghost" 
                             size="icon" 

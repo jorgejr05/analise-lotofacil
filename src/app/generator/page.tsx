@@ -108,12 +108,13 @@ export default function GeneratorPage() {
     setIsSaving(true);
     try {
       const valorTotal = generatedGames.length * 3.5;
+      const generationMethod = mode === 'ia' ? 'IA Preditiva' : 'Fechamento';
       
-      // Utilizamos o último concurso (lastContestNum) como âncora para o FK
       const gamesToSave = generatedGames.map(dezenas => ({
         user_id: user.id,
         dezenas,
-        concurso_referencia: lastContestNum 
+        concurso_referencia: lastContestNum,
+        metodo: generationMethod
       }));
 
       const { error: insertError } = await supabase.from('jogos').insert(gamesToSave);
@@ -126,7 +127,7 @@ export default function GeneratorPage() {
       setGeneratedGames([]);
     } catch (error: any) {
       console.error("Erro ao salvar jogos:", error);
-      toast.error("Erro técnico: " + (error.message || "Erro no banco de dados. Verifique sua conexão."));
+      toast.error("Erro técnico: " + (error.message || "Verifique se a coluna 'metodo' foi adicionada no banco."));
     } finally {
       setIsSaving(false);
     }
