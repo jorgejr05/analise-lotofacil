@@ -33,6 +33,8 @@ export const getBankrollStats = async (userId: string) => {
   const historyList = history || [];
   const totalApostado = historyList.reduce((acc, curr) => acc + Number(curr.valor_apostado), 0);
   const totalPremiado = historyList.reduce((acc, curr) => acc + Number(curr.valor_premiado), 0);
+  
+  // Cálculo de ROI no lado do cliente para garantir precisão
   const roiGeral = totalApostado > 0 ? ((totalPremiado - totalApostado) / totalApostado) * 100 : 0;
 
   // Cálculo de Max Drawdown e Curva de Equidade
@@ -63,7 +65,6 @@ export const getBankrollStats = async (userId: string) => {
 
 export const updateBankrollSettings = async (userId: string, initialAmount: number) => {
   try {
-    // 1. Busca o histórico para saber quanto o usuário já ganhou/perdeu
     const { data: history } = await supabase
       .from('bankroll_history')
       .select('valor_apostado, valor_premiado')
@@ -73,10 +74,8 @@ export const updateBankrollSettings = async (userId: string, initialAmount: numb
       return acc + (Number(curr.valor_premiado) - Number(curr.valor_apostado));
     }, 0);
 
-    // 2. O novo saldo atual é o NOVO aporte inicial + o que ele já operou
     const newCurrentBalance = initialAmount + totalProfitLoss;
 
-    // 3. Usamos UPSERT para garantir que o registro seja criado ou atualizado
     const { error } = await supabase
       .from('user_bankroll_settings')
       .upsert({ 
@@ -104,13 +103,12 @@ export const registerBet = async (userId: string, concursoId: number, valorApost
 
     const bankrollAntes = Number(settings?.bankroll_atual || 1000);
     
+    // REMOVIDO: lucro_prejuizo e roi_percentual (o banco calcula sozinho)
     const { error: historyError } = await supabase.from('bankroll_history').insert({
       user_id: userId,
       concurso_id: concursoId,
       valor_apostado: valorApostado,
       valor_premiado: 0,
-      lucro_prejuizo: -valorApostado,
-      roi_percentual: -100,
       bankroll_snapshot: bankrollAntes,
       is_simulado: isSimulado
     });
