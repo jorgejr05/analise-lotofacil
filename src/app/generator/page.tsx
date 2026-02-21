@@ -30,7 +30,8 @@ export default function GeneratorPage() {
   const [selectedPool, setSelectedPool] = useState<number[]>([]);
   const [isRealBet, setIsRealBet] = useState(false);
 
-  const nextContestNum = stats?.ultimoConcurso?.concurso ? stats.ultimoConcurso.concurso + 1 : 0;
+  const lastContestNum = stats?.ultimoConcurso?.concurso || 0;
+  const nextContestNum = lastContestNum + 1;
 
   useEffect(() => {
     if (stats && selectedPool.length === 0) {
@@ -99,30 +100,33 @@ export default function GeneratorPage() {
   }, [stats, quantity, mode, selectedPool, user, nextContestNum]);
 
   const handleSaveGames = async () => {
-    if (generatedGames.length === 0 || !user) return;
+    if (generatedGames.length === 0 || !user || !lastContestNum) {
+      toast.error("Estatísticas não carregadas ou nenhum jogo gerado.");
+      return;
+    }
+    
     setIsSaving(true);
     try {
       const valorTotal = generatedGames.length * 3.5;
       
+      // Utilizamos o último concurso (lastContestNum) como âncora para o FK
       const gamesToSave = generatedGames.map(dezenas => ({
         user_id: user.id,
         dezenas,
-        concurso_referencia: nextContestNum
+        concurso_referencia: lastContestNum 
       }));
 
-      // Registro dos jogos
       const { error: insertError } = await supabase.from('jogos').insert(gamesToSave);
       if (insertError) throw insertError;
 
-      // Registro financeiro
-      const financeResult = await registerBet(user.id, nextContestNum, valorTotal, !isRealBet);
+      const financeResult = await registerBet(user.id, lastContestNum, valorTotal, !isRealBet);
       if (!financeResult.success) throw new Error(financeResult.error);
 
-      toast.success(isRealBet ? "Aposta REAL registrada na banca!" : "Aposta SIMULADA registrada!");
+      toast.success(isRealBet ? "Aposta REAL registrada!" : "Simulação registrada com sucesso!");
       setGeneratedGames([]);
     } catch (error: any) {
       console.error("Erro ao salvar jogos:", error);
-      toast.error("Erro ao salvar: " + (error.message || "Erro desconhecido"));
+      toast.error("Erro técnico: " + (error.message || "Erro no banco de dados. Verifique sua conexão."));
     } finally {
       setIsSaving(false);
     }
