@@ -9,13 +9,13 @@ import {
   Trophy, 
   Calendar, 
   Sparkles, 
-  CheckCircle2,
   Wallet,
   Trash2,
   Loader2,
   BrainCircuit,
   Layers,
-  MousePointer2
+  MousePointer2,
+  AlertTriangle
 } from "lucide-react";
 import { 
   Select, 
@@ -24,6 +24,17 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { calculatePoints } from "@/lib/lotofacil-utils";
 import Link from "next/link";
@@ -36,6 +47,7 @@ export default function MyGamesPage() {
   const [selectedConcurso, setSelectedConcurso] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -76,11 +88,29 @@ export default function MyGamesPage() {
       if (error) throw error;
       
       setJogos(prev => prev.filter(j => j.id !== id));
-      toast.success("Jogo removido da sua base.");
+      toast.success("Jogo removido.");
     } catch (error: any) {
       toast.error("Erro ao deletar: " + error.message);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setIsClearingAll(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('jogos').delete().eq('user_id', user.id);
+      if (error) throw error;
+      
+      setJogos([]);
+      toast.success("Todos os jogos foram removidos!");
+    } catch (error: any) {
+      toast.error("Erro ao limpar histórico: " + error.message);
+    } finally {
+      setIsClearingAll(false);
     }
   };
 
@@ -127,11 +157,40 @@ export default function MyGamesPage() {
               <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tighter uppercase italic leading-none">
                 Meus <span className="text-indigo-600">Jogos</span>
               </h1>
-              <Link href="/bankroll" className="md:hidden">
-                <Button size="icon" variant="outline" className="rounded-full h-10 w-10 border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm">
-                  <Wallet className="h-5 w-5" />
-                </Button>
-              </Link>
+              
+              <div className="flex items-center gap-2">
+                {jogos.length > 0 && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 shadow-sm border border-rose-100 dark:border-rose-900/30">
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl bg-white dark:bg-slate-900">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100 uppercase italic font-black text-sm">
+                          <AlertTriangle className="h-5 w-5 text-rose-500" /> Limpeza Total
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase italic leading-relaxed">
+                          Você está prestes a apagar todos os {jogos.length} jogos salvos. Esta ação é irreversível e afetará seu histórico de assertividade. Deseja continuar?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="mt-4 gap-2">
+                        <AlertDialogCancel className="rounded-xl border-none bg-slate-100 dark:bg-slate-800 font-black uppercase italic text-[10px] h-11">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearAll} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase italic text-[10px] h-11 border-none shadow-lg shadow-rose-100 dark:shadow-none">
+                          Sim, Limpar Tudo
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+
+                <Link href="/bankroll">
+                  <Button size="icon" variant="outline" className="rounded-full h-10 w-10 border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm">
+                    <Wallet className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -160,7 +219,14 @@ export default function MyGamesPage() {
           </div>
         </header>
 
-        {jogos.length === 0 ? (
+        {isClearingAll && (
+          <div className="flex items-center justify-center py-10 gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-rose-500" />
+            <span className="text-[10px] font-black uppercase italic text-rose-500">Excluindo base de dados...</span>
+          </div>
+        )}
+
+        {jogos.length === 0 && !isClearingAll ? (
           <div className="py-20 text-center flex flex-col items-center gap-3 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
             <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
               <Sparkles className="h-8 w-8 text-slate-200 dark:text-slate-700" />
