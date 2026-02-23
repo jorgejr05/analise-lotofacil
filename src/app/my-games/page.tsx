@@ -15,7 +15,8 @@ import {
   BrainCircuit,
   Layers,
   MousePointer2,
-  AlertTriangle
+  AlertTriangle,
+  Clock
 } from "lucide-react";
 import { 
   Select, 
@@ -66,12 +67,12 @@ export default function MyGamesPage() {
       .from('concursos')
       .select('concurso, dezenas, data')
       .order('concurso', { ascending: false })
-      .limit(20);
+      .limit(30);
 
     if (gamesData) setJogos(gamesData);
     if (contestsData) {
       setConcursos(contestsData);
-      setSelectedConcurso(contestsData[0]?.concurso.toString());
+      // Mantemos selectedConcurso vazio por padrão como solicitado
     }
     
     setLoading(false);
@@ -106,9 +107,9 @@ export default function MyGamesPage() {
       if (error) throw error;
       
       setJogos([]);
-      toast.success("Todos os jogos foram removidos!");
+      toast.success("Histórico limpo com sucesso.");
     } catch (error: any) {
-      toast.error("Erro ao limpar histórico: " + error.message);
+      toast.error("Erro ao limpar: " + error.message);
     } finally {
       setIsClearingAll(false);
     }
@@ -120,28 +121,29 @@ export default function MyGamesPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-white dark:bg-slate-950">
         <History className="h-12 w-12 animate-pulse text-indigo-200 dark:text-indigo-900" />
-        <p className="text-slate-900 dark:text-slate-100 font-black tracking-tighter text-xl italic uppercase">Acessando Arquivos...</p>
+        <p className="text-slate-900 dark:text-slate-100 font-black tracking-tighter text-xl italic uppercase">Sincronizando Arquivos...</p>
       </div>
     );
   }
 
   const getMethodBadge = (metodo: string) => {
+    const baseClass = "font-black italic rounded-lg gap-1 px-3 py-1 text-[9px] uppercase tracking-widest";
     if (metodo === 'IA Preditiva') {
       return (
-        <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 font-black italic rounded-lg gap-1 px-3">
+        <Badge variant="secondary" className={cn(baseClass, "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30")}>
           <BrainCircuit className="h-3 w-3" /> IA Preditiva
         </Badge>
       );
     }
     if (metodo === 'Fechamento') {
       return (
-        <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 font-black italic rounded-lg gap-1 px-3">
+        <Badge variant="secondary" className={cn(baseClass, "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30")}>
           <Layers className="h-3 w-3" /> Fechamento
         </Badge>
       );
     }
     return (
-      <Badge variant="outline" className="text-slate-400 dark:text-slate-500 font-black italic rounded-lg gap-1 px-3">
+      <Badge variant="outline" className={cn(baseClass, "text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-800")}>
         <MousePointer2 className="h-3 w-3" /> Manual
       </Badge>
     );
@@ -172,12 +174,12 @@ export default function MyGamesPage() {
                           <AlertTriangle className="h-5 w-5 text-rose-500" /> Limpeza Total
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase italic leading-relaxed">
-                          Você está prestes a apagar todos os {jogos.length} jogos salvos. Esta ação é irreversível e afetará seu histórico de assertividade. Deseja continuar?
+                          Deseja apagar todos os {jogos.length} jogos? Esta ação limpará seu histórico de simulações e apostas.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter className="mt-4 gap-2">
                         <AlertDialogCancel className="rounded-xl border-none bg-slate-100 dark:bg-slate-800 font-black uppercase italic text-[10px] h-11">Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleClearAll} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase italic text-[10px] h-11 border-none shadow-lg shadow-rose-100 dark:shadow-none">
+                        <AlertDialogAction onClick={handleClearAll} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase italic text-[10px] h-11 border-none">
                           Sim, Limpar Tudo
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -195,13 +197,14 @@ export default function MyGamesPage() {
           </div>
 
           <div className="flex flex-col md:flex-row items-stretch md:items-end gap-4 w-full md:w-auto">
-            <div className="w-full md:w-72 space-y-2">
-              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Conferir com Resultado:</label>
+            <div className="w-full md:w-80 space-y-2">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Simular Conferência:</label>
               <Select value={selectedConcurso} onValueChange={setSelectedConcurso}>
                 <SelectTrigger className="h-12 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl font-bold text-slate-700 dark:text-slate-300 shadow-sm">
-                  <SelectValue placeholder="Selecione o concurso" />
+                  <SelectValue placeholder="Escolha um concurso para conferir" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-slate-100 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+                  <SelectItem value="none" className="font-bold py-3 text-slate-400">Nenhum (Visualizar Apenas)</SelectItem>
                   {concursos.map((c) => (
                     <SelectItem key={c.concurso} value={c.concurso.toString()} className="font-bold py-3">
                       Concurso {c.concurso} ({new Date(c.data).toLocaleDateString('pt-BR')})
@@ -210,21 +213,8 @@ export default function MyGamesPage() {
                 </SelectContent>
               </Select>
             </div>
-            
-            <Link href="/bankroll" className="hidden md:block">
-              <Button className="h-12 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl font-black uppercase italic tracking-widest text-[10px] px-6 shadow-lg shadow-slate-200 dark:shadow-none">
-                <Wallet className="h-4 w-4 mr-2" /> Minha Banca
-              </Button>
-            </Link>
           </div>
         </header>
-
-        {isClearingAll && (
-          <div className="flex items-center justify-center py-10 gap-3">
-            <Loader2 className="h-6 w-6 animate-spin text-rose-500" />
-            <span className="text-[10px] font-black uppercase italic text-rose-500">Excluindo base de dados...</span>
-          </div>
-        )}
 
         {jogos.length === 0 && !isClearingAll ? (
           <div className="py-20 text-center flex flex-col items-center gap-3 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -232,17 +222,19 @@ export default function MyGamesPage() {
               <Sparkles className="h-8 w-8 text-slate-200 dark:text-slate-700" />
             </div>
             <p className="text-slate-400 dark:text-slate-500 font-bold text-sm uppercase italic px-10">
-              Nenhum jogo registrado. Use o Motor Inteligente para gerar suas apostas.
+              Seu histórico está vazio. Gere novos jogos no Motor IA.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
             {jogos.map((jogo, idx) => {
-              const pontos = currentContestData 
+              // Só calcula se um concurso real foi selecionado (diferente de "none" ou vazio)
+              const hasSelection = selectedConcurso && selectedConcurso !== "none";
+              const pontos = hasSelection && currentContestData 
                 ? calculatePoints(jogo.dezenas, currentContestData.dezenas)
-                : 0;
+                : null;
               
-              const isWinner = pontos >= 11;
+              const isWinner = pontos !== null && pontos >= 11;
 
               return (
                 <Card 
@@ -254,48 +246,56 @@ export default function MyGamesPage() {
                 >
                   <div className="flex flex-col md:flex-row">
                     <div className={cn(
-                      "w-full md:w-28 p-6 flex md:flex-col items-center justify-center gap-4 text-white transition-colors duration-500",
+                      "w-full md:w-28 p-6 flex md:flex-col items-center justify-center gap-2 text-white transition-colors duration-500",
                       isWinner ? "bg-emerald-500" : "bg-slate-900 dark:bg-slate-800"
                     )}>
                       <div className="text-center">
-                        <div className="text-4xl font-black leading-none">{pontos}</div>
-                        <div className="text-[10px] font-black uppercase tracking-tighter opacity-80">Acertos</div>
+                        <div className="text-3xl md:text-4xl font-black leading-none">{pontos !== null ? pontos : "--"}</div>
+                        <div className="text-[8px] font-black uppercase tracking-tighter opacity-80">
+                          {pontos !== null ? "Acertos" : "Aguardando"}
+                        </div>
                       </div>
-                      {isWinner && <Trophy className="h-6 w-6 animate-bounce" />}
+                      {isWinner && <Trophy className="h-5 w-5 animate-bounce mt-2" />}
                     </div>
 
                     <CardContent className="flex-1 p-8 space-y-6 relative">
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           {getMethodBadge(jogo.metodo)}
-                          <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-800 font-black italic rounded-lg">
-                            {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
-                          </Badge>
+                          <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-800">
+                            <Calendar className="h-3 w-3 text-slate-400" />
+                            <span className="text-[9px] font-black text-slate-500 uppercase italic">
+                              {new Date(jogo.criado_em).toLocaleDateString('pt-BR')}
+                            </span>
+                            <span className="w-[1px] h-3 bg-slate-200 dark:bg-slate-700" />
+                            <Clock className="h-3 w-3 text-indigo-400" />
+                            <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase italic">
+                              {new Date(jogo.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
                         </div>
                         
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDeleteGame(jogo.id)}
-                            disabled={deletingId === jogo.id}
-                            className="h-8 w-8 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                          >
-                            {deletingId === jogo.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          </Button>
-                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteGame(jogo.id)}
+                          disabled={deletingId === jogo.id}
+                          className="h-8 w-8 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                        >
+                          {deletingId === jogo.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
                       </div>
 
                       <div className="grid grid-cols-5 md:grid-cols-8 lg:grid-cols-15 gap-2">
                         {jogo.dezenas.map((num: number) => {
-                          const isHit = currentContestData?.dezenas.includes(num);
+                          const isHit = hasSelection && currentContestData?.dezenas.includes(num);
                           return (
                             <div 
                               key={num} 
                               className={cn(
                                 "aspect-square flex items-center justify-center rounded-xl text-xs font-black shadow-inner transition-all duration-300",
                                 isHit 
-                                  ? "bg-emerald-500 text-white border-emerald-400 scale-110 shadow-emerald-100" 
+                                  ? "bg-emerald-500 text-white border-emerald-400 scale-110 shadow-lg shadow-emerald-100 dark:shadow-none" 
                                   : "bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500"
                               )}
                             >
