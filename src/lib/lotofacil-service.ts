@@ -2,6 +2,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
+import { calculateNextDrawDate } from "./utils";
+
 
 // =============================================================================
 // SUPABASE EDGE FUNCTION — sync-lotofacil (sa-east-1, São Paulo)
@@ -67,22 +69,7 @@ export async function getNextDrawInfo() {
 
 
 
-function calculateNextDrawDate(now: Date) {
-  const next = new Date(now);
-  const hour = next.getHours();
-  const day = next.getDay();
 
-  if (day === 0) {
-    next.setDate(next.getDate() + 1);
-  } else if (day === 6 && hour >= 20) {
-    next.setDate(next.getDate() + 2);
-  } else if (hour >= 20) {
-    next.setDate(next.getDate() + 1);
-  }
-  
-  next.setHours(20, 0, 0, 0);
-  return next;
-}
 
 /**
  * Sincronização via Supabase Edge Function (sa-east-1, São Paulo).

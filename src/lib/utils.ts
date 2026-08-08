@@ -27,3 +27,18 @@ export function formatDateTime(date: Date) {
     second: '2-digit'
   }).format(date);
 }
+
+export function calculateNextDrawDate(now: Date) {
+  const next = new Date(now);
+  const hour = next.getHours();
+  const day = next.getDay();
+  if (day === 0) {
+    next.setDate(next.getDate() + 1);
+  } else if (day === 6 && hour >= 20) {
+    next.setDate(next.getDate() + 2);
+  } else if (hour >= 20) {
+    next.setDate(next.getDate() + 1);
+  }
+  next.setHours(20, 0, 0, 0);
+  return next;
+}

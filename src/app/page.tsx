@@ -2,12 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLotofacilStats } from "@/hooks/use-lotofacil-stats";
-import { syncLatestResults, getNextDrawInfo } from "@/lib/lotofacil-service";
+import { calculateNextDrawDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Hash, Clock, Sparkles, Flame, Snowflake, Trophy, Loader2, Target, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDateTime } from "@/lib/utils";
+
+// URL da Supabase Edge Function rodando em sa-east-1 (São Paulo).
+// Chamada diretamente do BROWSER (que está no Brasil) para garantir que
+// a edge function também execute de um nó brasileiro → sem bloqueio de IP.
+const EDGE_FN_URL = 'https://jkjjuicthxcmiidaiiof.supabase.co/functions/v1/sync-lotofacil';
+
 
 export default function Dashboard() {
   const { stats, loading, refresh } = useLotofacilStats();
@@ -16,33 +22,54 @@ export default function Dashboard() {
   const [nextDraw, setNextDraw] = useState<any>(null);
 
   const loadNextDrawInfo = useCallback(async () => {
-    const info = await getNextDrawInfo();
-    setNextDraw(info);
+    try {
+      // Chamada direta do browser → edge function roda no nó BR mais próximo
+      const res = await fetch(`${EDGE_FN_URL}?action=check`, { cache: 'no-store' });
+      if (res.ok) {
+        const info = await res.json();
+        setNextDraw({
+          lastNum: info.lastNum ?? 0,
+          nextNum: (info.lastNum ?? 0) + 1,
+          apiLatestNum: info.apiLatest ?? null,
+          isPendingSync: info.isPending === true,
+          concursosFaltando: info.gap ?? 0,
+          nextDrawDate: calculateNextDrawDate(new Date()),
+        });
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Falha ao verificar status:', err);
+    }
   }, []);
 
   const handleSync = useCallback(async (silent = false) => {
     if (syncing) return;
     setSyncing(true);
     try {
-      const res = await syncLatestResults();
-      if (res.success) {
-        const count = (res as any).count ?? 0;
+      // POST direto do browser → edge function executa de São Paulo → sem bloqueio
+      const res = await fetch(`${EDGE_FN_URL}?action=sync`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const count = data.count ?? 0;
         if (count > 0) {
-          if (!silent) toast.success(`✅ ${count} concurso(s) sincronizado(s)! Banco atualizado até #${(res as any).latest}.`);
+          if (!silent) toast.success(`✅ ${count} concurso(s) sincronizado(s)! Banco atualizado até #${data.latest}.`);
           await refresh();
         } else if (!silent) {
           toast.info("✓ Base já está atualizada com o último sorteio.");
         }
       } else {
-        if (!silent) toast.error(`Falha: ${(res as any).message || "Erro ao conectar à API."}`);
+        if (!silent) toast.error(`Falha: ${data.message || "Erro ao conectar à API."}`);
       }
       await loadNextDrawInfo();
     } catch (error) {
-      if (!silent) toast.error("Falha na sincronização com a API Guidi.");
+      if (!silent) toast.error("Falha ao conectar com a Edge Function.");
     } finally {
       setSyncing(false);
     }
   }, [syncing, refresh, loadNextDrawInfo]);
+
 
 
   useEffect(() => {
