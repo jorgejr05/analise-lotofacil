@@ -4,15 +4,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
 // =============================================================================
-// FONTES DE DADOS — Fallback em cadeia para garantir disponibilidade na Vercel
+// PROXY INTERNO — /api/loto-proxy/[concurso]
 //
-// PROBLEMA: API Guidi bloqueia IPs de fora do Brasil (servidores Vercel = EUA).
-// SOLUÇÃO:  Usar a API oficial da Caixa como fonte primária (sem restrição geo)
-//           e a Guidi como fallback secundário (útil em dev local).
+// Por que proxy interno em vez de chamar as APIs externas diretamente?
+//
+// PROBLEMA: Server Actions ("use server") e Serverless Functions na Vercel
+//           rodam em servidores AWS nos EUA → IPs bloqueados pelas APIs BR.
+//
+// SOLUÇÃO:  Edge Functions (runtime = 'edge') rodam na CDN Cloudflare no nó
+//           MAIS PRÓXIMO do usuário. Como o usuário está no Brasil, a edge
+//           function roda de São Paulo e acessa a Caixa/Guidi sem bloqueio.
+//           A Server Action chama o proxy interno, que por sua vez chama a API.
 // =============================================================================
 
-const CAIXA_BASE = 'https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil';
-const GUIDI_BASE = 'https://api.guidi.dev.br/loteria/lotofacil';
+/** URL base do proxy interno — em dev usa localhost, em prod usa o domínio da Vercel */
+function getProxyBase(): string {
+  // VERCEL_URL é injetado automaticamente pela Vercel em produção
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  // NEXT_PUBLIC_APP_URL pode ser configurado como variável de ambiente opcional
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  // Dev local
+  return 'http://localhost:3000';
+}
 
 /** Valida que o payload tem os campos mínimos necessários */
 function isValidPayload(data: any): boolean {
@@ -20,84 +33,43 @@ function isValidPayload(data: any): boolean {
 }
 
 /**
- * Busca dados de um concurso específico.
- * Tenta a API da Caixa primeiro (sem bloqueio geo).
- * Cai na Guidi se a Caixa falhar (útil em dev local).
+ * Busca dados de um concurso específico via proxy interno Edge.
+ * A Edge Function roda no nó Cloudflare mais próximo do usuário (SP para BR).
  */
 async function fetchConcursoData(num: number): Promise<any | null> {
-  // ── Fonte 1: API Oficial da Caixa Econômica Federal ──────────────────────
   try {
-    const res = await fetch(`${CAIXA_BASE}/${num}`, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
-    });
+    const url = `${getProxyBase()}/api/loto-proxy/${num}`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
-      if (isValidPayload(data)) {
-        console.log(`[Caixa API] Concurso ${num} OK.`);
-        return data;
-      }
+      if (isValidPayload(data)) return data;
     }
   } catch (err) {
-    console.warn(`[Caixa API] Concurso ${num} falhou, tentando Guidi...`, err);
+    console.error(`[Proxy] Falha ao buscar concurso ${num}:`, err);
   }
-
-  // ── Fonte 2: Guidi (fallback, funciona só do Brasil) ─────────────────────
-  try {
-    const res = await fetch(`${GUIDI_BASE}/${num}?t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (isValidPayload(data)) {
-        console.log(`[Guidi API] Concurso ${num} OK (fallback).`);
-        return data;
-      }
-    }
-  } catch (err) {
-    console.error(`[Guidi API] Concurso ${num} também falhou:`, err);
-  }
-
   return null;
 }
 
 /**
- * Busca o número do concurso mais recente disponível.
- * Tenta a API da Caixa (endpoint vazio = último) e cai na Guidi como fallback.
+ * Busca o número do concurso mais recente via proxy interno Edge.
  */
 async function fetchUltimoConcursoNum(): Promise<number | null> {
-  // ── Fonte 1: Caixa (endpoint raiz retorna o último concurso) ─────────────
   try {
-    const res = await fetch(`${CAIXA_BASE}/`, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
-    });
+    const url = `${getProxyBase()}/api/loto-proxy/ultimo`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data?.numero) {
-        console.log(`[Caixa API] Último concurso: #${data.numero}`);
+        console.log(`[Proxy] Último concurso: #${data.numero}`);
         return Number(data.numero);
       }
     }
   } catch (err) {
-    console.warn('[Caixa API] Falha ao buscar último, tentando Guidi...', err);
+    console.warn('[Proxy] Falha ao buscar último concurso:', err);
   }
-
-  // ── Fonte 2: Guidi /ultimo (fallback) ────────────────────────────────────
-  try {
-    const res = await fetch(`${GUIDI_BASE}/ultimo?t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.numero) return Number(data.numero);
-    }
-  } catch {}
-
   return null;
 }
+
 
 
 /**
