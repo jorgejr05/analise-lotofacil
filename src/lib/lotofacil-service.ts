@@ -32,7 +32,27 @@ async function fetchGuidiData(num: number) {
 }
 
 /**
- * Determina se há concursos pendentes comparando o banco com o calendário.
+ * Busca o número do concurso mais recente disponível na API Guidi.
+ * Usa o endpoint /ultimo que retorna sempre o concurso mais atual.
+ */
+async function fetchUltimoConcursoNum(): Promise<number | null> {
+  try {
+    const url = `https://api.guidi.dev.br/loteria/lotofacil/ultimo?t=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.numero ? Number(data.numero) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Determina se há concursos pendentes comparando o banco com a API.
+ * Usa o endpoint /ultimo para saber o número real do último sorteio.
  */
 export async function getNextDrawInfo() {
   const { data: lastSaved } = await supabase
@@ -43,29 +63,22 @@ export async function getNextDrawInfo() {
     .maybeSingle();
 
   const lastNum = lastSaved?.concurso || 0;
-  const nextNum = lastNum + 1;
-  
-  const now = new Date();
-  const currentHour = now.getHours();
-  
-  // Data do último sorteio que DEVERIA ter acontecido (Seg-Sáb 20h)
-  const lastExpectedDraw = new Date();
-  if (currentHour < 20) {
-    lastExpectedDraw.setDate(lastExpectedDraw.getDate() - 1);
-  }
-  if (lastExpectedDraw.getDay() === 0) { // Domingo não tem sorteio
-    lastExpectedDraw.setDate(lastExpectedDraw.getDate() - 1);
-  }
-  lastExpectedDraw.setHours(20, 0, 0, 0);
 
-  const lastSavedDate = lastSaved?.data ? new Date(lastSaved.data + 'T20:00:00') : new Date(0);
-  const isPendingSync = lastSavedDate < lastExpectedDraw;
+  // Busca o concurso mais recente disponível na API
+  const apiLatestNum = await fetchUltimoConcursoNum();
+  const nextNum = lastNum + 1;
+
+  // Há pendência se a API tem concursos além do que está no banco
+  const isPendingSync = apiLatestNum !== null && apiLatestNum > lastNum;
+  const concursosFaltando = isPendingSync && apiLatestNum ? apiLatestNum - lastNum : 0;
 
   return {
     lastNum,
     nextNum,
+    apiLatestNum,
     isPendingSync,
-    nextDrawDate: calculateNextDrawDate(now)
+    concursosFaltando,
+    nextDrawDate: calculateNextDrawDate(new Date())
   };
 }
 
@@ -87,10 +100,15 @@ function calculateNextDrawDate(now: Date) {
 }
 
 /**
- * Sincronização Forçada: Tenta buscar o próximo concurso.
+ * Sincronização Inteligente:
+ * 1. Detecta o concurso mais recente disponível na API (/ultimo)
+ * 2. Calcula o gap real entre o banco e a API
+ * 3. Importa TODOS os concursos faltando em lotes paralelos de 5
+ * Suporta gaps grandes (ex: 100+ concursos) sem travar.
  */
 export const syncLatestResults = async () => {
   try {
+    // Descobre o último salvo no banco
     const { data: lastSaved } = await supabase
       .from('concursos')
       .select('concurso')
@@ -99,49 +117,80 @@ export const syncLatestResults = async () => {
       .maybeSingle();
 
     const lastNum = lastSaved?.concurso || 0;
-    let currentTarget = lastNum + 1;
-    let count = 0;
-    let lastSynced = lastNum;
 
-    // Busca sequencial para garantir que não pulamos nenhum concurso
-    while (count < 5) {
-      const rawData = await fetchGuidiData(currentTarget);
-      
-      if (!rawData) {
-        console.log(`[Sync] Concurso ${currentTarget} ainda não disponível na API.`);
-        break;
-      }
+    // Descobre o último disponível na API
+    const apiLatestNum = await fetchUltimoConcursoNum();
 
-      const { data: anterior } = await supabase
-        .from('concursos')
-        .select('*')
-        .eq('concurso', currentTarget - 1)
-        .maybeSingle();
-
-      const processed = processConcursoData(rawData, anterior || undefined);
-      
-      const { error } = await supabase
-        .from('concursos')
-        .upsert(processed, { onConflict: 'concurso' });
-      
-      if (error) {
-        console.error("[Sync Error] Falha de RLS ou Banco:", error.message);
-        return { success: false, message: error.message };
-      }
-
-      lastSynced = currentTarget;
-      currentTarget++;
-      count++;
+    if (!apiLatestNum) {
+      console.log('[Sync] Não foi possível contatar a API Guidi.');
+      return { success: false, message: 'API Guidi indisponível.' };
     }
 
-    return { 
-      success: true, 
-      count,
-      latest: lastSynced 
-    };
+    if (apiLatestNum <= lastNum) {
+      console.log(`[Sync] Banco já está atualizado (${lastNum} = API ${apiLatestNum}).`);
+      return { success: true, count: 0, latest: lastNum };
+    }
+
+    const gap = apiLatestNum - lastNum;
+    console.log(`[Sync] Gap detectado: ${gap} concurso(s) faltando (#${lastNum + 1} até #${apiLatestNum}).`);
+
+    // Monta lista de concursos a buscar
+    const targets: number[] = [];
+    for (let n = lastNum + 1; n <= apiLatestNum; n++) targets.push(n);
+
+    let count = 0;
+    let lastSynced = lastNum;
+    const BATCH = 5; // lotes paralelos de 5 para não sobrecarregar a API
+
+    for (let i = 0; i < targets.length; i += BATCH) {
+      const lote = targets.slice(i, i + BATCH);
+
+      // Busca o lote em paralelo
+      const rawResults = await Promise.all(lote.map(n => fetchGuidiData(n)));
+
+      const registros: any[] = [];
+      for (let j = 0; j < lote.length; j++) {
+        const num = lote[j];
+        const raw = rawResults[j];
+        if (!raw) {
+          console.log(`[Sync] Concurso ${num} ainda não disponível na API.`);
+          continue;
+        }
+
+        const { data: anterior } = await supabase
+          .from('concursos')
+          .select('*')
+          .eq('concurso', num - 1)
+          .maybeSingle();
+
+        registros.push(processConcursoData(raw, anterior || undefined));
+        lastSynced = Math.max(lastSynced, num);
+      }
+
+      if (registros.length > 0) {
+        const { error } = await supabase
+          .from('concursos')
+          .upsert(registros, { onConflict: 'concurso' });
+
+        if (error) {
+          console.error('[Sync Error] Falha ao salvar lote:', error.message);
+          return { success: false, message: error.message };
+        }
+        count += registros.length;
+      }
+
+      // Delay respeitoso entre lotes
+      if (i + BATCH < targets.length) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    console.log(`[Sync] Concluído: ${count} concurso(s) importado(s). Último: #${lastSynced}.`);
+    return { success: true, count, latest: lastSynced };
+
   } catch (error: any) {
-    console.error("[Sync Error] Falha crítica:", error);
-    return { success: false, message: "Erro de conexão." };
+    console.error('[Sync Error] Falha crítica:', error);
+    return { success: false, message: 'Erro de conexão.' };
   }
 };
 

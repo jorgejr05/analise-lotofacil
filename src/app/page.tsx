@@ -28,19 +28,22 @@ export default function Dashboard() {
       if (res.success) {
         const count = (res as any).count ?? 0;
         if (count > 0) {
-          if (!silent) toast.success(`${count} novo(s) concurso(s) sincronizado(s)!`);
-          await refresh(); 
+          if (!silent) toast.success(`✅ ${count} concurso(s) sincronizado(s)! Banco atualizado até #${(res as any).latest}.`);
+          await refresh();
         } else if (!silent) {
-          toast.info("Nenhum resultado novo encontrado na API.");
+          toast.info("✓ Base já está atualizada com o último sorteio.");
         }
+      } else {
+        if (!silent) toast.error(`Falha: ${(res as any).message || "Erro ao conectar à API."}`);
       }
       await loadNextDrawInfo();
     } catch (error) {
-      if (!silent) toast.error("Falha na sincronização com a API.");
+      if (!silent) toast.error("Falha na sincronização com a API Guidi.");
     } finally {
       setSyncing(false);
     }
   }, [syncing, refresh, loadNextDrawInfo]);
+
 
   useEffect(() => {
     if (!loading) {
@@ -118,6 +121,7 @@ export default function Dashboard() {
               {syncing ? 'Sincronizando...' : nextDraw?.isPendingSync ? 'Resolver Pendência' : 'Sincronizar Base'}
             </Button>
 
+
             {nextDraw && (
               <div className={cn(
                 "flex items-center gap-3 px-5 py-3 rounded-2xl border-2 transition-all",
@@ -127,13 +131,20 @@ export default function Dashboard() {
               )}>
                 {nextDraw.isPendingSync ? <AlertCircle className="h-4 w-4 text-amber-500" /> : <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
                 <div className="flex flex-col">
-                  <span className="text-[8px] font-black uppercase tracking-widest">Status do Alvo #{nextDraw.nextNum}</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest">
+                    {nextDraw.isPendingSync 
+                      ? `${nextDraw.concursosFaltando ?? 1} concurso(s) pendente(s)` 
+                      : `Alvo: Concurso #${nextDraw.nextNum}`}
+                  </span>
                   <span className="text-[10px] font-black italic uppercase">
-                    {nextDraw.isPendingSync ? "Resultado Disponível para Sincronia" : "Base de Dados Atualizada"}
+                    {nextDraw.isPendingSync 
+                      ? `Banco: #${nextDraw.lastNum} → API: #${nextDraw.apiLatestNum ?? '?'}` 
+                      : "Base de Dados Atualizada"}
                   </span>
                 </div>
               </div>
             )}
+
           </div>
         </header>
 
