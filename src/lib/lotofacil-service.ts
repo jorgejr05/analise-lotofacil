@@ -4,105 +4,68 @@ import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
 // =============================================================================
-// PROXY INTERNO — /api/loto-proxy/[concurso]
+// SUPABASE EDGE FUNCTION — sync-lotofacil (sa-east-1, São Paulo)
 //
-// Por que proxy interno em vez de chamar as APIs externas diretamente?
+// Todas as tentativas anteriores falharam porque:
+//   - Server Actions (Vercel) → AWS us-east-1 → IPs bloqueados pelas APIs BR
+//   - Edge Function Next.js → Cloudflare, mas chamada vem do servidor (EUA)
+//   - API Caixa direta → também bloqueada de IPs internacionais
 //
-// PROBLEMA: Server Actions ("use server") e Serverless Functions na Vercel
-//           rodam em servidores AWS nos EUA → IPs bloqueados pelas APIs BR.
-//
-// SOLUÇÃO:  Edge Functions (runtime = 'edge') rodam na CDN Cloudflare no nó
-//           MAIS PRÓXIMO do usuário. Como o usuário está no Brasil, a edge
-//           function roda de São Paulo e acessa a Caixa/Guidi sem bloqueio.
-//           A Server Action chama o proxy interno, que por sua vez chama a API.
+// SOLUÇÃO FINAL: Supabase Edge Function rodando em sa-east-1 (São Paulo).
+//   Roda em Deno Deploy na região brasileira, acessa Caixa/Guidi sem bloqueio.
+//   Suporta ?action=check (só status) e ?action=sync (importa tudo).
 // =============================================================================
 
-/** URL base do proxy interno — em dev usa localhost, em prod usa o domínio da Vercel */
-function getProxyBase(): string {
-  // VERCEL_URL é injetado automaticamente pela Vercel em produção
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  // NEXT_PUBLIC_APP_URL pode ser configurado como variável de ambiente opcional
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  // Dev local
-  return 'http://localhost:3000';
-}
-
-/** Valida que o payload tem os campos mínimos necessários */
-function isValidPayload(data: any): boolean {
-  return !!data && !!data.numero && Array.isArray(data.listaDezenas) && data.listaDezenas.length === 15;
-}
+const EDGE_FN_URL = 'https://jkjjuicthxcmiidaiiof.supabase.co/functions/v1/sync-lotofacil';
 
 /**
- * Busca dados de um concurso específico via proxy interno Edge.
- * A Edge Function roda no nó Cloudflare mais próximo do usuário (SP para BR).
- */
-async function fetchConcursoData(num: number): Promise<any | null> {
-  try {
-    const url = `${getProxyBase()}/api/loto-proxy/${num}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (isValidPayload(data)) return data;
-    }
-  } catch (err) {
-    console.error(`[Proxy] Falha ao buscar concurso ${num}:`, err);
-  }
-  return null;
-}
-
-/**
- * Busca o número do concurso mais recente via proxy interno Edge.
- */
-async function fetchUltimoConcursoNum(): Promise<number | null> {
-  try {
-    const url = `${getProxyBase()}/api/loto-proxy/ultimo`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.numero) {
-        console.log(`[Proxy] Último concurso: #${data.numero}`);
-        return Number(data.numero);
-      }
-    }
-  } catch (err) {
-    console.warn('[Proxy] Falha ao buscar último concurso:', err);
-  }
-  return null;
-}
-
-
-
-/**
- * Determina se há concursos pendentes comparando o banco com a API.
- * Usa o endpoint /ultimo para saber o número real do último sorteio.
+ * Determina se há concursos pendentes usando a Edge Function em SP.
  */
 export async function getNextDrawInfo() {
+  // Consulta o banco local para ter o lastNum como fallback imediato
   const { data: lastSaved } = await supabase
     .from('concursos')
-    .select('concurso, data')
+    .select('concurso')
     .order('concurso', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   const lastNum = lastSaved?.concurso || 0;
 
-  // Busca o concurso mais recente disponível na API
-  const apiLatestNum = await fetchUltimoConcursoNum();
-  const nextNum = lastNum + 1;
+  // Chama a Edge Function no modo "check" — não importa nada, só retorna status
+  try {
+    const res = await fetch(`${EDGE_FN_URL}?action=check`, { cache: 'no-store' });
+    if (res.ok) {
+      const info = await res.json();
+      const apiLatestNum: number = info.apiLatest ?? lastNum;
+      const isPendingSync = info.isPending === true;
+      const concursosFaltando: number = info.gap ?? 0;
 
-  // Há pendência se a API tem concursos além do que está no banco
-  const isPendingSync = apiLatestNum !== null && apiLatestNum > lastNum;
-  const concursosFaltando = isPendingSync && apiLatestNum ? apiLatestNum - lastNum : 0;
+      return {
+        lastNum,
+        nextNum: lastNum + 1,
+        apiLatestNum,
+        isPendingSync,
+        concursosFaltando,
+        nextDrawDate: calculateNextDrawDate(new Date()),
+      };
+    }
+  } catch (err) {
+    console.warn('[EdgeFn] check falhou, usando dados locais:', err);
+  }
 
+  // Fallback: sem acesso à API, usa só o banco local
   return {
     lastNum,
-    nextNum,
-    apiLatestNum,
-    isPendingSync,
-    concursosFaltando,
-    nextDrawDate: calculateNextDrawDate(new Date())
+    nextNum: lastNum + 1,
+    apiLatestNum: null,
+    isPendingSync: false,
+    concursosFaltando: 0,
+    nextDrawDate: calculateNextDrawDate(new Date()),
   };
 }
+
+
 
 function calculateNextDrawDate(now: Date) {
   const next = new Date(now);
@@ -122,97 +85,31 @@ function calculateNextDrawDate(now: Date) {
 }
 
 /**
- * Sincronização Inteligente:
- * 1. Detecta o concurso mais recente disponível na API (/ultimo)
- * 2. Calcula o gap real entre o banco e a API
- * 3. Importa TODOS os concursos faltando em lotes paralelos de 5
- * Suporta gaps grandes (ex: 100+ concursos) sem travar.
+ * Sincronização via Supabase Edge Function (sa-east-1, São Paulo).
+ * A Edge Function detecta o gap, busca da API da Caixa e salva tudo no banco.
+ * Uma única chamada HTTP substitui toda a lógica anterior.
  */
 export const syncLatestResults = async () => {
   try {
-    // Descobre o último salvo no banco
-    const { data: lastSaved } = await supabase
-      .from('concursos')
-      .select('concurso')
-      .order('concurso', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    console.log('[Sync] Chamando Edge Function sync-lotofacil...');
+    const res = await fetch(`${EDGE_FN_URL}?action=sync`, {
+      method: 'POST',
+      cache: 'no-store',
+    });
 
-    const lastNum = lastSaved?.concurso || 0;
+    const data = await res.json();
 
-    // Descobre o último disponível na API
-    const apiLatestNum = await fetchUltimoConcursoNum();
-
-    if (!apiLatestNum) {
-      console.log('[Sync] Não foi possível contatar a API Guidi.');
-      return { success: false, message: 'API Guidi indisponível.' };
+    if (!res.ok || !data.success) {
+      console.error('[Sync] Edge Function retornou erro:', data.message);
+      return { success: false, message: data.message || 'Erro na Edge Function.' };
     }
 
-    if (apiLatestNum <= lastNum) {
-      console.log(`[Sync] Banco já está atualizado (${lastNum} = API ${apiLatestNum}).`);
-      return { success: true, count: 0, latest: lastNum };
-    }
-
-    const gap = apiLatestNum - lastNum;
-    console.log(`[Sync] Gap detectado: ${gap} concurso(s) faltando (#${lastNum + 1} até #${apiLatestNum}).`);
-
-    // Monta lista de concursos a buscar
-    const targets: number[] = [];
-    for (let n = lastNum + 1; n <= apiLatestNum; n++) targets.push(n);
-
-    let count = 0;
-    let lastSynced = lastNum;
-    const BATCH = 5; // lotes paralelos de 5 para não sobrecarregar a API
-
-    for (let i = 0; i < targets.length; i += BATCH) {
-      const lote = targets.slice(i, i + BATCH);
-
-      // Busca o lote em paralelo
-      const rawResults = await Promise.all(lote.map(n => fetchConcursoData(n)));
-
-      const registros: any[] = [];
-      for (let j = 0; j < lote.length; j++) {
-        const num = lote[j];
-        const raw = rawResults[j];
-        if (!raw) {
-          console.log(`[Sync] Concurso ${num} ainda não disponível na API.`);
-          continue;
-        }
-
-        const { data: anterior } = await supabase
-          .from('concursos')
-          .select('*')
-          .eq('concurso', num - 1)
-          .maybeSingle();
-
-        registros.push(processConcursoData(raw, anterior || undefined));
-        lastSynced = Math.max(lastSynced, num);
-      }
-
-      if (registros.length > 0) {
-        const { error } = await supabase
-          .from('concursos')
-          .upsert(registros, { onConflict: 'concurso' });
-
-        if (error) {
-          console.error('[Sync Error] Falha ao salvar lote:', error.message);
-          return { success: false, message: error.message };
-        }
-        count += registros.length;
-      }
-
-      // Delay respeitoso entre lotes
-      if (i + BATCH < targets.length) {
-        await new Promise(r => setTimeout(r, 200));
-      }
-    }
-
-    console.log(`[Sync] Concluído: ${count} concurso(s) importado(s). Último: #${lastSynced}.`);
-    return { success: true, count, latest: lastSynced };
+    console.log(`[Sync] Edge Function concluiu: ${data.count} importados. Último: #${data.latest}`);
+    return { success: true, count: data.count, latest: data.latest };
 
   } catch (error: any) {
-    console.error('[Sync Error] Falha crítica:', error);
-    return { success: false, message: 'Erro de conexão.' };
+    console.error('[Sync] Falha ao chamar Edge Function:', error);
+    return { success: false, message: 'Erro ao conectar com a Edge Function.' };
   }
 };
 
@@ -232,14 +129,33 @@ export interface SyncProgressPayload {
 }
 
 /**
- * Busca dados de um concurso com retry automático.
- * Usa fallback Caixa → Guidi (mesmo esquema da fetchConcursoData).
- * Aguarda 300ms entre tentativas para evitar rate limit.
+ * Busca dados de um concurso com retry automático (Caixa → Guidi).
+ * Usada pelo syncHistoricalBatch do painel Lab (importação histórica).
  */
 async function fetchConcursoComRetry(num: number, tentativas = 3): Promise<any | null> {
+  const CAIXA = 'https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil';
+  const GUIDI  = 'https://api.guidi.dev.br/loteria/lotofacil';
+  const h = { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-Importer' };
+
   for (let t = 0; t < tentativas; t++) {
-    const data = await fetchConcursoData(num);
-    if (data) return data;
+    // Tenta Caixa primeiro
+    try {
+      const r = await fetch(`${CAIXA}/${num}`, { cache: 'no-store', headers: h });
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.numero && Array.isArray(d?.listaDezenas) && d.listaDezenas.length === 15) return d;
+      }
+    } catch {}
+
+    // Fallback Guidi
+    try {
+      const r = await fetch(`${GUIDI}/${num}?t=${Date.now()}`, { cache: 'no-store', headers: h });
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.numero && Array.isArray(d?.listaDezenas) && d.listaDezenas.length === 15) return d;
+      }
+    } catch {}
+
     if (t < tentativas - 1) await new Promise(r => setTimeout(r, 300));
   }
   return null;
