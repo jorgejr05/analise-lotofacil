@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { runBacktestBatch } from "@/lib/lab-service";
 import { cn } from "@/lib/utils";
+import { ImportacaoHistoricaPanel } from "@/components/importacao-historica-panel";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from "recharts";
@@ -144,6 +145,9 @@ export default function LabPage() {
             Validação de <span className="text-indigo-600">Eficiência</span>
           </h1>
         </header>
+
+        {/* ─── Painel de Importação Histórica ─────────────────────────────── */}
+        <ImportacaoHistoricaPanel />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
