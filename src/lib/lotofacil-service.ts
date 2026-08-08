@@ -3,52 +3,102 @@
 import { supabase } from "@/integrations/supabase/client";
 import { processConcursoData } from "./lotofacil-utils";
 
-/**
- * Busca dados de um concurso específico na API Guidi.
- */
-async function fetchGuidiData(num: number) {
-  try {
-    // Adicionamos um timestamp para evitar cache agressivo de provedores
-    const url = `https://api.guidi.dev.br/loteria/lotofacil/${num}?t=${Date.now()}`;
-    const res = await fetch(url, { 
-      cache: 'no-store',
-      headers: { 
-        'Accept': 'application/json',
-        'User-Agent': 'LotoExpert-App'
-      }
-    });
-    
-    if (!res.ok) return null;
-    const data = await res.json();
-    
-    // Validação rigorosa: a API Guidi retorna o número do concurso no campo 'numero'
-    if (!data || !data.numero || !data.listaDezenas) return null;
-    
-    return data;
-  } catch (error) {
-    console.error(`[Guidi API Error] Concurso ${num}:`, error);
-    return null;
-  }
+// =============================================================================
+// FONTES DE DADOS — Fallback em cadeia para garantir disponibilidade na Vercel
+//
+// PROBLEMA: API Guidi bloqueia IPs de fora do Brasil (servidores Vercel = EUA).
+// SOLUÇÃO:  Usar a API oficial da Caixa como fonte primária (sem restrição geo)
+//           e a Guidi como fallback secundário (útil em dev local).
+// =============================================================================
+
+const CAIXA_BASE = 'https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil';
+const GUIDI_BASE = 'https://api.guidi.dev.br/loteria/lotofacil';
+
+/** Valida que o payload tem os campos mínimos necessários */
+function isValidPayload(data: any): boolean {
+  return !!data && !!data.numero && Array.isArray(data.listaDezenas) && data.listaDezenas.length === 15;
 }
 
 /**
- * Busca o número do concurso mais recente disponível na API Guidi.
- * Usa o endpoint /ultimo que retorna sempre o concurso mais atual.
+ * Busca dados de um concurso específico.
+ * Tenta a API da Caixa primeiro (sem bloqueio geo).
+ * Cai na Guidi se a Caixa falhar (útil em dev local).
+ */
+async function fetchConcursoData(num: number): Promise<any | null> {
+  // ── Fonte 1: API Oficial da Caixa Econômica Federal ──────────────────────
+  try {
+    const res = await fetch(`${CAIXA_BASE}/${num}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (isValidPayload(data)) {
+        console.log(`[Caixa API] Concurso ${num} OK.`);
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn(`[Caixa API] Concurso ${num} falhou, tentando Guidi...`, err);
+  }
+
+  // ── Fonte 2: Guidi (fallback, funciona só do Brasil) ─────────────────────
+  try {
+    const res = await fetch(`${GUIDI_BASE}/${num}?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (isValidPayload(data)) {
+        console.log(`[Guidi API] Concurso ${num} OK (fallback).`);
+        return data;
+      }
+    }
+  } catch (err) {
+    console.error(`[Guidi API] Concurso ${num} também falhou:`, err);
+  }
+
+  return null;
+}
+
+/**
+ * Busca o número do concurso mais recente disponível.
+ * Tenta a API da Caixa (endpoint vazio = último) e cai na Guidi como fallback.
  */
 async function fetchUltimoConcursoNum(): Promise<number | null> {
+  // ── Fonte 1: Caixa (endpoint raiz retorna o último concurso) ─────────────
   try {
-    const url = `https://api.guidi.dev.br/loteria/lotofacil/ultimo?t=${Date.now()}`;
-    const res = await fetch(url, {
+    const res = await fetch(`${CAIXA_BASE}/`, {
       cache: 'no-store',
-      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' }
+      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.numero ? Number(data.numero) : null;
-  } catch {
-    return null;
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.numero) {
+        console.log(`[Caixa API] Último concurso: #${data.numero}`);
+        return Number(data.numero);
+      }
+    }
+  } catch (err) {
+    console.warn('[Caixa API] Falha ao buscar último, tentando Guidi...', err);
   }
+
+  // ── Fonte 2: Guidi /ultimo (fallback) ────────────────────────────────────
+  try {
+    const res = await fetch(`${GUIDI_BASE}/ultimo?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json', 'User-Agent': 'LotoExpert-App' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.numero) return Number(data.numero);
+    }
+  } catch {}
+
+  return null;
 }
+
 
 /**
  * Determina se há concursos pendentes comparando o banco com a API.
@@ -146,7 +196,7 @@ export const syncLatestResults = async () => {
       const lote = targets.slice(i, i + BATCH);
 
       // Busca o lote em paralelo
-      const rawResults = await Promise.all(lote.map(n => fetchGuidiData(n)));
+      const rawResults = await Promise.all(lote.map(n => fetchConcursoData(n)));
 
       const registros: any[] = [];
       for (let j = 0; j < lote.length; j++) {
@@ -210,31 +260,19 @@ export interface SyncProgressPayload {
 }
 
 /**
- * Busca dados da API Guidi com retry automático.
+ * Busca dados de um concurso com retry automático.
+ * Usa fallback Caixa → Guidi (mesmo esquema da fetchConcursoData).
  * Aguarda 300ms entre tentativas para evitar rate limit.
  */
-async function fetchGuidiComRetry(num: number, tentativas = 3): Promise<any | null> {
+async function fetchConcursoComRetry(num: number, tentativas = 3): Promise<any | null> {
   for (let t = 0; t < tentativas; t++) {
-    try {
-      const url = `https://api.guidi.dev.br/loteria/lotofacil/${num}?t=${Date.now()}`;
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { Accept: "application/json", "User-Agent": "LotoExpert-Importer" },
-      });
-      if (!res.ok) {
-        if (res.status === 404) return null; // Concurso não existe, parar
-        await new Promise(r => setTimeout(r, 300));
-        continue;
-      }
-      const data = await res.json();
-      if (!data?.numero || !data?.listaDezenas) return null;
-      return data;
-    } catch {
-      if (t < tentativas - 1) await new Promise(r => setTimeout(r, 300));
-    }
+    const data = await fetchConcursoData(num);
+    if (data) return data;
+    if (t < tentativas - 1) await new Promise(r => setTimeout(r, 300));
   }
   return null;
 }
+
 
 /**
  * Importa um intervalo de concursos em lotes paralelos de `batchSize`.
@@ -288,7 +326,7 @@ export async function syncHistoricalBatch(
     const lote = faltando.slice(i, i + batchSize);
 
     // Busca todos do lote em paralelo
-    const rawResults = await Promise.all(lote.map(n => fetchGuidiComRetry(n)));
+    const rawResults = await Promise.all(lote.map(n => fetchConcursoComRetry(n)));
 
     const registros: any[] = [];
     for (let j = 0; j < lote.length; j++) {
